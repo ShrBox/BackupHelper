@@ -1,35 +1,47 @@
-# LeviLamina Plugin Template
+# BackupHelper
 
-A LeviLamina plugin template
+Original plugin: https://github.com/YQ-LL-Plugins/BackupHelper  
+A LeviLamina plugin which is port from LiteLoaderBDS to help you backup more easily
 
-This plugin is a template for developing LeviLamina plugins.
+## Download
 
-## Install
-
-Generate a new repository from this template.
+```
+lip install github.com/ShrBox/BackupHelper
+```
 
 ## Usage
 
-Before using this plugin template, make sure that you have installed XMake and a Minecraft Bedrock Server with LeviLamina.
+`/backup` - Start backup now
 
-1. Clone the new repository into a local folder.
+`/backup list` - List all backups existing
 
-1. Change the plugin name and the expected LeviLamina version in `xmake.lua`.
+`/backup recover [number]` - Select recover to a certain backup version, and restart server to finish recover process
 
-1. Add your code.
+`/backup reload` - Reload config file
 
-1. Run `xmake repo -u` in the root of the repository.
+These commands can be executed at BDS console, or by OPs in game.
 
-1. Run `xmake` to build the plugin.
 
-Now the build is complete at `bin/`.
 
-## Contributing
+## Config file
 
-Ask questions by creating an issue.
+At `plugins/BackupHelper/config.ini`, with comments in file
 
-PRs accepted.
+```ini
+[Main]
+; 语言
+Language=zh_CN
 
-## License
+; 备份存档保存的最长时间，单位：天
+MaxStorageTime=7
 
-CC0-1.0 © LiteLDev
+; 备份文件夹位置
+BackupPath=.\backup
+
+; 备份文件压缩等级，可选等级有0,1,3,5,7,9
+; 默认为0，即仅打包
+Compress=0
+
+; 等待压缩的最长时间，单位：秒，如果为0则无限等待
+MaxWaitForZip=1800
+```

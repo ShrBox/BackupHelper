@@ -2,8 +2,8 @@
 
 #include <ll/api/plugin/NativePlugin.h>
 
-namespace change_this {
+namespace BackupHelper {
 
 [[nodiscard]] auto getSelfPluginInstance() -> ll::plugin::NativePlugin&;
 
-} // namespace change_this
+} // namespace BackupHelper
