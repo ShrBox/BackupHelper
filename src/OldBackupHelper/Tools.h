@@ -12,12 +12,15 @@
 template <typename... Args>
 inline void SendFeedback(Player* p, const std::string& msg) {
     bool found = false;
-    ll::service::getLevel()->forEachPlayer([&p, &found](Player& player) {
-        if (player == *p) {
-            found = true;
-        }
-        return true;
-    });
+    auto level = ll::service::getLevel();
+    if (level.has_value()) {
+        level->forEachPlayer([&p, &found](Player& player) {
+            if (player == *p) {
+                found = true;
+            }
+            return true;
+        });
+    }
     if (!found) {
         extern Player* nowPlayer;
         nowPlayer = p = nullptr;

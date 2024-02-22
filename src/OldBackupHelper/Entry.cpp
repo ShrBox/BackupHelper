@@ -66,6 +66,7 @@ auto disable(ll::plugin::NativePlugin& /*self*/) -> bool { return true; }
 
 auto enable(ll::plugin::NativePlugin& self) -> bool {
     auto& logger = self.getLogger();
+    RegisterCommand();
     ll::event::EventBus::getInstance().emplaceListener<ll::event::ExecutingCommandEvent>(
         [&logger](ll::event::ExecutingCommandEvent& ev) {
             std::string cmd = ev.commandContext().mCommand;
@@ -84,9 +85,9 @@ auto load(ll::plugin::NativePlugin& self) -> bool {
     auto& logger       = self.getLogger();
     selfPluginInstance = std::make_unique<std::reference_wrapper<ll::plugin::NativePlugin>>(self);
     Raw_IniOpen(_CONFIG_FILE, "");
-    ll::i18n::MultiFileI18N i18n;
-    i18n.load(std::string("plugins/BackupHelper/LangPack/") + ini.GetValue("Main", "Language", "en_US") + ".json");
+    ll::i18n::MultiFileI18N i18n("./plugins/BackupHelper/LangPack/", ini.GetValue("Main", "Language", "en_US"));
     ll::i18n::getInstance() = std::make_unique<ll::i18n::MultiFileI18N>(i18n);
+    logger.info("BackupHelper loaded! Author: yqs112358, Ported by: ShrBox");
     return true;
 }
 
