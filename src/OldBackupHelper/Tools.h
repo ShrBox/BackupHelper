@@ -15,7 +15,7 @@ inline void SendFeedback(Player* p, const std::string& msg) {
     auto level = ll::service::getLevel();
     if (level.has_value()) {
         level->forEachPlayer([&p, &found](Player& player) {
-            if (player == *p) {
+            if (&player == p) {
                 found = true;
             }
             return true;
