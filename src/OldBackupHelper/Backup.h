@@ -1,10 +1,9 @@
 #pragma once
+#include "mc/deps/core/mce/UUID.h"
 #include <string>
 #include <vector>
 
-class Player;
-
-extern Player*                  nowPlayer;
+extern mce::UUID                playerUuid;
 extern std::vector<std::string> backupList;
 extern bool                     isWorking;
 

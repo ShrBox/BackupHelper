@@ -4,6 +4,7 @@
 #include "Tools.h"
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/schedule/Task.h"
+#include "mc/deps/core/mce/UUID.h"
 #include "mc/server/commands/CommandOutput.h"
 #include "mc/server/commands/CommandPermissionLevel.h"
 #include <filesystem>
@@ -15,62 +16,62 @@
 
 extern ll::schedule::GameTickScheduler scheduler;
 
-void CmdReloadConfig(Player* p) {
+void CmdReloadConfig(mce::UUID uuid) {
     ini.Reset();
     auto res = ini.LoadFile(_CONFIG_FILE);
     if (res < 0) {
-        SendFeedback(p, "Failed to open Config File!");
+        SendFeedback(uuid, "Failed to open Config File!");
     } else {
-        SendFeedback(p, "Config File reloaded.");
+        SendFeedback(uuid, "Config File reloaded.");
     }
 }
 
-void CmdBackup(Player* p) {
-    Player* oldp = nowPlayer;
-    nowPlayer    = p;
+void CmdBackup(mce::UUID uuid) {
+    mce::UUID oldUuid = playerUuid;
+    playerUuid        = uuid;
     if (isWorking) {
-        SendFeedback(p, "An existing backup is working now...");
-        nowPlayer = oldp;
+        SendFeedback(uuid, "An existing backup is working now...");
+        playerUuid = oldUuid;
     } else scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), StartBackup);
 }
 
-void CmdCancel(Player* p) {
+void CmdCancel(mce::UUID uuid) {
     if (isWorking) {
-        isWorking = false;
-        nowPlayer = nullptr;
-        SendFeedback(p, "Backup is Canceled.");
+        isWorking  = false;
+        playerUuid = mce::UUID::EMPTY;
+        SendFeedback(uuid, "Backup is Canceled.");
     } else {
-        SendFeedback(p, "No backup is working now.");
+        SendFeedback(uuid, "No backup is working now.");
     }
     if (ini.GetBoolValue("BackFile", "isBack", false)) {
         ini.SetBoolValue("BackFile", "isBack", false);
         ini.SaveFile(_CONFIG_FILE);
         std::filesystem::remove_all("./plugins/BackupHelper/temp1/");
-        SendFeedback(p, "Recover is Canceled.");
+        SendFeedback(uuid, "Recover is Canceled.");
     }
 }
 
 // 接到回档指令，回档前文件解压
-void CmdRecoverBefore(Player* p, int recover_Num) {
-    Player* oldp = nowPlayer;
-    nowPlayer    = p;
+void CmdRecoverBefore(mce::UUID uuid, int recover_Num) {
+    mce::UUID oldUuid = playerUuid;
+    playerUuid        = uuid;
     if (isWorking) {
-        SendFeedback(p, "An existing task is working now...Please wait and try again");
-        nowPlayer = oldp;
+        SendFeedback(uuid, "An existing task is working now...Please wait and try again");
+        playerUuid = oldUuid;
     } else scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), [recover_Num] { StartRecover(recover_Num); });
 }
 // 列出存在的存档备份
-void CmdListBackup(Player* player, int limit) {
+void CmdListBackup(mce::UUID uuid, int limit) {
     backupList = getAllBackup();
     if (backupList.empty()) {
-        SendFeedback(player, "No Backup Files");
+        SendFeedback(uuid, "No Backup Files");
         return;
     }
     int totalSize = backupList.size();
     int maxNum    = totalSize < limit ? totalSize : limit;
-    SendFeedback(player, "使用存档文件前的数字选择回档文件");
+    SendFeedback(uuid, "使用存档文件前的数字选择回档文件");
     for (int i = 0; i < maxNum; i++) {
-        SendFeedback(player, fmt::format("[{}]:{}", i, backupList[i].c_str()));
+        SendFeedback(uuid, fmt::format("[{}]:{}", i, backupList[i].c_str()));
     }
 }
 
@@ -78,17 +79,17 @@ void CmdListBackup(Player* player, int limit) {
 void RecoverWorld() {
     bool isBack = ini.GetBoolValue("BackFile", "isBack", false);
     if (isBack) {
-        SendFeedback(nullptr, "正在回档......");
+        SendFeedback(mce::UUID::EMPTY, "正在回档......");
         std::string worldName = ini.GetValue("BackFile", "worldName", "Bedrock level");
         if (!CopyRecoverFile(worldName)) {
             ini.SetBoolValue("BackFile", "isBack", false);
             ini.SaveFile(_CONFIG_FILE);
-            SendFeedback(nullptr, "回档失败！");
+            SendFeedback(mce::UUID::EMPTY, "回档失败！");
             return;
         }
         ini.SetBoolValue("BackFile", "isBack", false);
         ini.SaveFile(_CONFIG_FILE);
-        SendFeedback(nullptr, "回档成功");
+        SendFeedback(mce::UUID::EMPTY, "回档成功");
     }
 }
 
@@ -109,18 +110,27 @@ void RegisterCommand() {
         .execute<
             [&](CommandOrigin const& origin, CommandOutput& output, BackupMainCommand const& param, Command const&) {
                 if (!param.backupOperation) {
-                    CmdBackup(static_cast<Player*>(origin.getEntity()));
+                    CmdBackup(
+                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY
+                    );
                     return;
                 }
                 switch (param.backupOperation) {
                 case BackupOperation::reload:
-                    CmdReloadConfig(static_cast<Player*>(origin.getEntity()));
+                    CmdReloadConfig(
+                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY
+                    );
                     break;
                 case BackupOperation::cancel:
-                    CmdCancel(static_cast<Player*>(origin.getEntity()));
+                    CmdCancel(
+                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY
+                    );
                     break;
                 case BackupOperation::list:
-                    CmdListBackup(static_cast<Player*>(origin.getEntity()), 100);
+                    CmdListBackup(
+                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY,
+                        100
+                    );
                     break;
                 default:
                     output.error("Unknown operation");
@@ -132,6 +142,9 @@ void RegisterCommand() {
         .required("recoverNumber")
         .execute<
             [&](CommandOrigin const& origin, CommandOutput& output, BackupRecoverCommand const& param, Command const&) {
-                CmdRecoverBefore(static_cast<Player*>(origin.getEntity()), param.recoverNumber);
+                CmdRecoverBefore(
+                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY,
+                    param.recoverNumber
+                );
             }>();
 }

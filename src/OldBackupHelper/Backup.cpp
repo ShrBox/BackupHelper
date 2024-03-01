@@ -4,6 +4,7 @@
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/schedule/Task.h"
 #include "ll/api/utils/ErrorUtils.h"
+#include "mc/deps/core/mce/UUID.h"
 #include <filesystem>
 #include <ll/api/memory/Hook.h>
 #include <ll/api/schedule/Scheduler.h>
@@ -28,8 +29,8 @@
 #define TEMP1_DIR "./plugins/BackupHelper/temp1/"
 #define ZIP_PATH  ".\\plugins\\BackupHelper\\7za.exe"
 
-bool                     isWorking  = false;
-Player*                  nowPlayer  = nullptr;
+bool                     isWorking = false;
+mce::UUID                playerUuid;
 std::vector<std::string> backupList = {};
 
 struct SnapshotFilenameAndLength {
@@ -42,16 +43,16 @@ ll::schedule::GameTickScheduler scheduler;
 void ResumeBackup();
 
 void SuccessEnd() {
-    SendFeedback(nowPlayer, "备份成功结束");
-    nowPlayer = nullptr;
+    SendFeedback(playerUuid, "备份成功结束");
+    playerUuid = mce::UUID::EMPTY;
     // The isWorking assignment here has been moved to line 321
 }
 
 void FailEnd(int code = -1) {
-    SendFeedback(nowPlayer, std::string("备份失败！") + (code == -1 ? "" : "错误码：" + std::to_string(code)));
+    SendFeedback(playerUuid, std::string("备份失败！") + (code == -1 ? "" : "错误码：" + std::to_string(code)));
     ResumeBackup();
-    nowPlayer = nullptr;
-    isWorking = false;
+    playerUuid = mce::UUID::EMPTY;
+    isWorking  = false;
 }
 
 void ControlResourceUsage(HANDLE process) {
@@ -82,7 +83,7 @@ void ControlResourceUsage(HANDLE process) {
 void ClearOldBackup() {
     int days = ini.GetLongValue("Main", "MaxStorageTime", -1);
     if (days < 0) return;
-    SendFeedback(nowPlayer, "备份最长保存时间：" + std::to_string(days) + "天");
+    SendFeedback(playerUuid, "备份最长保存时间：" + std::to_string(days) + "天");
 
     time_t       timeStamp = time(NULL) - days * 86400;
     std::wstring dirBackup = ll::string_utils::str2wstr(ini.GetValue("Main", "BackupPath", "backup"));
@@ -94,7 +95,7 @@ void ClearOldBackup() {
 
     HANDLE hFind = FindFirstFile(dirFind.c_str(), &findFileData);
     if (hFind == INVALID_HANDLE_VALUE) {
-        SendFeedback(nowPlayer, "Fail to locate old backups.");
+        SendFeedback(playerUuid, "Fail to locate old backups.");
         return;
     }
     do {
@@ -110,7 +111,7 @@ void ClearOldBackup() {
     } while (FindNextFile(hFind, &findFileData));
     FindClose(hFind);
 
-    if (clearCount > 0) SendFeedback(nowPlayer, std::to_string(clearCount) + " old backups cleaned.");
+    if (clearCount > 0) SendFeedback(playerUuid, std::to_string(clearCount) + " old backups cleaned.");
     return;
 }
 
@@ -120,8 +121,8 @@ void CleanTempDir() {
 }
 
 bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLength>& files) {
-    SendFeedback(nowPlayer, "已抓取到BDS待备份文件清单。正在处理...");
-    SendFeedback(nowPlayer, "正在复制文件...");
+    SendFeedback(playerUuid, "已抓取到BDS待备份文件清单。正在处理...");
+    SendFeedback(playerUuid, "正在复制文件...");
 
     // Copy Files
     CleanTempDir();
@@ -136,7 +137,7 @@ bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLeng
         ec
     );
     if (ec.value() != 0) {
-        SendFeedback(nowPlayer, "Failed to copy save files!\n" + ec.message());
+        SendFeedback(playerUuid, "Failed to copy save files!\n" + ec.message());
         FailEnd(GetLastError());
         return false;
     }
@@ -160,13 +161,13 @@ bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLeng
 
         if (hSaveFile == INVALID_HANDLE_VALUE || !SetFilePointerEx(hSaveFile, pos, &curPos, FILE_BEGIN)
             || !SetEndOfFile(hSaveFile)) {
-            SendFeedback(nowPlayer, "Failed to truncate " + toFile + "!");
+            SendFeedback(playerUuid, "Failed to truncate " + toFile + "!");
             FailEnd(GetLastError());
             return false;
         }
         CloseHandle(hSaveFile);
     }
-    SendFeedback(nowPlayer, "压缩过程可能花费相当长的时间，请耐心等待");
+    SendFeedback(playerUuid, "压缩过程可能花费相当长的时间，请耐心等待");
     return true;
 }
 
@@ -212,7 +213,7 @@ bool ZipFiles(const std::string& worldName) {
         sh.lpFile                = zipPath.c_str();
         sh.lpParameters          = paras;
         if (!ShellExecuteEx(&sh)) {
-            SendFeedback(nowPlayer, "Fail to create Zip process!");
+            SendFeedback(playerUuid, "Fail to create Zip process!");
             FailEnd(GetLastError());
             return false;
         }
@@ -223,16 +224,16 @@ bool ZipFiles(const std::string& worldName) {
         // Wait
         DWORD res;
         if ((res = WaitForSingleObject(sh.hProcess, maxWait)) == WAIT_TIMEOUT || res == WAIT_FAILED) {
-            SendFeedback(nowPlayer, "Zip process timeout!");
+            SendFeedback(playerUuid, "Zip process timeout!");
             FailEnd(GetLastError());
         }
         CloseHandle(sh.hProcess);
     } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(nowPlayer, "Exception in zip process! Error Code:" + std::to_string(e.code().value()));
+        SendFeedback(playerUuid, "Exception in zip process! Error Code:" + std::to_string(e.code().value()));
         FailEnd(GetLastError());
         return false;
     } catch (const std::exception& e) {
-        SendFeedback(nowPlayer, std::string("Exception in zip process!\n") + e.what());
+        SendFeedback(playerUuid, std::string("Exception in zip process!\n") + e.what());
         FailEnd(GetLastError());
         return false;
     }
@@ -268,7 +269,7 @@ bool UnzipFiles(const std::string& fileName) {
         sh.lpFile                = zipPath.c_str();
         sh.lpParameters          = paras;
         if (!ShellExecuteEx(&sh)) {
-            SendFeedback(nowPlayer, "Fail to Unzip process!");
+            SendFeedback(playerUuid, "Fail to Unzip process!");
             // FailEnd(GetLastError());
             return false;
         }
@@ -279,16 +280,16 @@ bool UnzipFiles(const std::string& fileName) {
         // Wait
         DWORD res;
         if ((res = WaitForSingleObject(sh.hProcess, maxWait)) == WAIT_TIMEOUT || res == WAIT_FAILED) {
-            SendFeedback(nowPlayer, "Unzip process timeout!");
+            SendFeedback(playerUuid, "Unzip process timeout!");
             // FailEnd(GetLastError());
         }
         CloseHandle(sh.hProcess);
     } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(nowPlayer, "Exception in unzip process! Error Code:" + std::to_string(e.code().value()));
+        SendFeedback(playerUuid, "Exception in unzip process! Error Code:" + std::to_string(e.code().value()));
         // FailEnd(GetLastError());
         return false;
     } catch (const std::exception& e) {
-        SendFeedback(nowPlayer, std::string("Exception in unzip process!\n") + e.what());
+        SendFeedback(playerUuid, std::string("Exception in unzip process!\n") + e.what());
         // FailEnd(GetLastError());
         return false;
     }
@@ -332,7 +333,7 @@ bool CopyRecoverFile(const std::string& worldName) {
     }
     std::filesystem::copy(TEMP1_DIR, "./worlds", std::filesystem::copy_options::recursive, error);
     if (error.value() != 0) {
-        SendFeedback(nowPlayer, "Failed to copy files!\n" + error.message());
+        SendFeedback(playerUuid, "Failed to copy files!\n" + error.message());
         std::filesystem::remove_all(TEMP1_DIR);
         std::filesystem::rename("./worlds/" + worldName + "_bak", "./worlds/" + worldName);
         return false;
@@ -343,7 +344,7 @@ bool CopyRecoverFile(const std::string& worldName) {
 }
 
 bool StartBackup() {
-    SendFeedback(nowPlayer, "备份已启动");
+    SendFeedback(playerUuid, "备份已启动");
     isWorking = true;
     ClearOldBackup();
     CommandContext context = CommandContext(
@@ -355,7 +356,7 @@ bool StartBackup() {
     try {
         ll::service::getMinecraft()->getCommands().executeCommand(context, false);
     } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(nowPlayer, "Failed to start backup snapshot!");
+        SendFeedback(playerUuid, "Failed to start backup snapshot!");
         FailEnd(e.code().value());
         return false;
     }
@@ -363,24 +364,24 @@ bool StartBackup() {
 }
 
 bool StartRecover(int recover_NUM) {
-    SendFeedback(nowPlayer, "回档前准备已启动");
+    SendFeedback(playerUuid, "回档前准备已启动");
     if (backupList.empty()) {
-        SendFeedback(nowPlayer, "插件内部存档列表为空，请使用list子指令后再试");
+        SendFeedback(playerUuid, "插件内部存档列表为空，请使用list子指令后再试");
         return false;
     }
     unsigned int i = recover_NUM + 1;
     if (i > backupList.size()) {
-        SendFeedback(nowPlayer, "存档选择参数不在已有存档数内，请重新选择");
+        SendFeedback(playerUuid, "存档选择参数不在已有存档数内，请重新选择");
         return false;
     }
     isWorking = true;
-    SendFeedback(nowPlayer, "正在进行回档文件解压复制");
+    SendFeedback(playerUuid, "正在进行回档文件解压复制");
     if (!UnzipFiles(backupList[recover_NUM])) {
-        SendFeedback(nowPlayer, "回档文件准备失败");
+        SendFeedback(playerUuid, "回档文件准备失败");
         isWorking = false;
         return false;
     };
-    SendFeedback(nowPlayer, "回档文件准备完成,即将进行回档前备份");
+    SendFeedback(playerUuid, "回档文件准备完成,即将进行回档前备份");
     CommandContext context = CommandContext(
         "save hold",
         std::make_unique<ServerCommandOrigin>(
@@ -388,7 +389,7 @@ bool StartRecover(int recover_NUM) {
         )
     );
     ll::service::getMinecraft()->getCommands().executeCommand(context, false);
-    SendFeedback(nowPlayer, "回档准备已完成，重启可回档,使用backup cancel指令可取消回档");
+    SendFeedback(playerUuid, "回档准备已完成，重启可回档,使用backup cancel指令可取消回档");
     backupList.clear();
     return true;
 }
@@ -417,13 +418,13 @@ void ResumeBackup() {
             }
         }
         if (!output.getSuccessCount()) {
-            SendFeedback(nowPlayer, "Failed to resume backup snapshot!");
+            SendFeedback(playerUuid, "Failed to resume backup snapshot!");
             scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(RETRY_TICKS), ResumeBackup);
         } else {
-            SendFeedback(nowPlayer, outputStr);
+            SendFeedback(playerUuid, outputStr);
         }
     } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(nowPlayer, "Failed to resume backup snapshot! Error Code:" + std::to_string(e.code().value()));
+        SendFeedback(playerUuid, "Failed to resume backup snapshot! Error Code:" + std::to_string(e.code().value()));
         if (isWorking) scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(RETRY_TICKS), ResumeBackup);
     }
 }

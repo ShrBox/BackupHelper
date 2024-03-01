@@ -1,5 +1,6 @@
 #pragma once
 #include "Entry.h"
+#include "mc/deps/core/mce/UUID.h"
 #include <exception>
 #include <ll/api/Logger.h>
 #include <ll/api/service/Bedrock.h>
@@ -10,34 +11,31 @@
 
 
 template <typename... Args>
-inline void SendFeedback(Player* p, const std::string& msg) {
-    bool found = false;
-    auto level = ll::service::getLevel();
-    if (level.has_value()) {
-        level->forEachPlayer([&p, &found](Player& player) {
-            if (&player == p) {
-                found = true;
-            }
-            return true;
-        });
+inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
+    bool    found = false;
+    auto    level = ll::service::getLevel();
+    Player* player;
+    if (level.has_value() && !uuid.isEmpty()) {
+        if ((player = level->getPlayer(uuid))) {
+            found = true;
+        }
     }
     if (!found) {
-        extern Player* nowPlayer;
-        nowPlayer = p = nullptr;
+        extern mce::UUID playerUuid;
+        playerUuid = uuid;
     }
-
-    if (!p) BackupHelper::getSelfPluginInstance().getLogger().info(msg);
+    if (!found || uuid.isEmpty()) BackupHelper::getSelfPluginInstance().getLogger().info(msg);
     else {
         try {
             // p->sendTextPacket("§e[BackupHelper]§r " + msg, TextType::RAW);
-            p->sendMessage("§e[BackupHelper]§r " + msg);
+            player->sendMessage("§e[BackupHelper]§r " + msg);
         } catch (const ll::error_utils::seh_exception&) {
-            extern Player* nowPlayer;
-            nowPlayer = nullptr;
+            extern mce::UUID playerUuid;
+            playerUuid = mce::UUID::EMPTY;
             BackupHelper::getSelfPluginInstance().getLogger().info(msg);
         } catch (const std::exception&) {
-            extern Player* nowPlayer;
-            nowPlayer = nullptr;
+            extern mce::UUID playerUuid;
+            playerUuid = mce::UUID::EMPTY;
             BackupHelper::getSelfPluginInstance().getLogger().info(msg);
         }
     }
