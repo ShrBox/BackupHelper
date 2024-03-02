@@ -30,6 +30,7 @@ At `plugins/BackupHelper/config.ini`, with comments in file
 ```ini
 [Main]
 ; 语言
+; Change it to en_US to switch to English
 Language=zh_CN
 
 ; 备份存档保存的最长时间，单位：天

@@ -3,6 +3,7 @@
 #include "ConfigFile.h"
 #include "Tools.h"
 #include "ll/api/chrono/GameChrono.h"
+#include "ll/api/i18n/I18n.h"
 #include "ll/api/schedule/Task.h"
 #include "mc/deps/core/mce/UUID.h"
 #include "mc/server/commands/CommandOutput.h"
@@ -15,14 +16,15 @@
 #include <mc/world/actor/player/Player.h>
 
 extern ll::schedule::GameTickScheduler scheduler;
+using ll::i18n_literals::operator""_tr;
 
 void CmdReloadConfig(mce::UUID uuid) {
     ini.Reset();
     auto res = ini.LoadFile(_CONFIG_FILE);
     if (res < 0) {
-        SendFeedback(uuid, "Failed to open Config File!");
+        SendFeedback(uuid, "Failed to open Config File!"_tr());
     } else {
-        SendFeedback(uuid, "Config File reloaded.");
+        SendFeedback(uuid, "Config File reloaded."_tr());
     }
 }
 
@@ -30,7 +32,7 @@ void CmdBackup(mce::UUID uuid) {
     mce::UUID oldUuid = playerUuid;
     playerUuid        = uuid;
     if (isWorking) {
-        SendFeedback(uuid, "An existing backup is working now...");
+        SendFeedback(uuid, "An existing backup is working now..."_tr());
         playerUuid = oldUuid;
     } else scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), StartBackup);
 }
@@ -39,15 +41,15 @@ void CmdCancel(mce::UUID uuid) {
     if (isWorking) {
         isWorking  = false;
         playerUuid = mce::UUID::EMPTY;
-        SendFeedback(uuid, "Backup is Canceled.");
+        SendFeedback(uuid, "Backup is Canceled."_tr());
     } else {
-        SendFeedback(uuid, "No backup is working now.");
+        SendFeedback(uuid, "No backup is working now."_tr());
     }
     if (ini.GetBoolValue("BackFile", "isBack", false)) {
         ini.SetBoolValue("BackFile", "isBack", false);
         ini.SaveFile(_CONFIG_FILE);
         std::filesystem::remove_all("./plugins/BackupHelper/temp1/");
-        SendFeedback(uuid, "Recover is Canceled.");
+        SendFeedback(uuid, "Recover is Canceled."_tr());
     }
 }
 
@@ -56,7 +58,7 @@ void CmdRecoverBefore(mce::UUID uuid, int recover_Num) {
     mce::UUID oldUuid = playerUuid;
     playerUuid        = uuid;
     if (isWorking) {
-        SendFeedback(uuid, "An existing task is working now...Please wait and try again");
+        SendFeedback(uuid, "An existing task is working now...Please wait and try again"_tr());
         playerUuid = oldUuid;
     } else scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), [recover_Num] { StartRecover(recover_Num); });
 }
@@ -64,12 +66,12 @@ void CmdRecoverBefore(mce::UUID uuid, int recover_Num) {
 void CmdListBackup(mce::UUID uuid, int limit) {
     backupList = getAllBackup();
     if (backupList.empty()) {
-        SendFeedback(uuid, "No Backup Files");
+        SendFeedback(uuid, "No Backup Files"_tr());
         return;
     }
     int totalSize = backupList.size();
     int maxNum    = totalSize < limit ? totalSize : limit;
-    SendFeedback(uuid, "使用存档文件前的数字选择回档文件");
+    SendFeedback(uuid, "Select the rollback file using the number before the archive file"_tr());
     for (int i = 0; i < maxNum; i++) {
         SendFeedback(uuid, fmt::format("[{}]:{}", i, backupList[i].c_str()));
     }
@@ -79,17 +81,17 @@ void CmdListBackup(mce::UUID uuid, int limit) {
 void RecoverWorld() {
     bool isBack = ini.GetBoolValue("BackFile", "isBack", false);
     if (isBack) {
-        SendFeedback(mce::UUID::EMPTY, "正在回档......");
+        SendFeedback(mce::UUID::EMPTY, "Rollbacking..."_tr());
         std::string worldName = ini.GetValue("BackFile", "worldName", "Bedrock level");
         if (!CopyRecoverFile(worldName)) {
             ini.SetBoolValue("BackFile", "isBack", false);
             ini.SaveFile(_CONFIG_FILE);
-            SendFeedback(mce::UUID::EMPTY, "回档失败！");
+            SendFeedback(mce::UUID::EMPTY, "Failed to rollback"_tr());
             return;
         }
         ini.SetBoolValue("BackFile", "isBack", false);
         ini.SaveFile(_CONFIG_FILE);
-        SendFeedback(mce::UUID::EMPTY, "回档成功");
+        SendFeedback(mce::UUID::EMPTY, "Rollback successfully"_tr());
     }
 }
 
@@ -104,7 +106,7 @@ struct BackupRecoverCommand {
 void RegisterCommand() {
     using ll::command::CommandRegistrar;
     auto& command = ll::command::CommandRegistrar::getInstance()
-                        .getOrCreateCommand("backup", "Create a backup", CommandPermissionLevel::GameDirectors);
+                        .getOrCreateCommand("backup", "Create a backup"_tr(), CommandPermissionLevel::GameDirectors);
     command.overload<BackupMainCommand>()
         .optional("backupOperation")
         .execute<

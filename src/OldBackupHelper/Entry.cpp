@@ -20,6 +20,7 @@
 #include <stdexcept>
 
 CSimpleIniA ini;
+using ll::i18n_literals::operator""_tr;
 
 namespace BackupHelper {
 
@@ -52,7 +53,7 @@ bool Raw_IniOpen(const magic_enum::string& path, const std::string& defContent) 
     ini.SetUnicode(true);
     auto res = ini.LoadFile(path.c_str());
     if (res < 0) {
-        BackupHelper::getSelfPluginInstance().getLogger().error("Failed to open Config File!");
+        BackupHelper::getSelfPluginInstance().getLogger().error("Failed to open configuration file!"_tr());
         return false;
     } else {
         return true;
@@ -74,7 +75,7 @@ auto enable(ll::plugin::NativePlugin& self) -> bool {
                 cmd.erase(0, 1);
             }
             if (cmd == "stop" && GetIsWorking()) {
-                logger.error("Don't execute stop command when backup");
+                logger.error("Don't execute stop command when backup"_tr());
             }
         }
     );
@@ -85,9 +86,9 @@ auto load(ll::plugin::NativePlugin& self) -> bool {
     auto& logger       = self.getLogger();
     selfPluginInstance = std::make_unique<std::reference_wrapper<ll::plugin::NativePlugin>>(self);
     Raw_IniOpen(_CONFIG_FILE, "");
-    ll::i18n::MultiFileI18N i18n("./plugins/BackupHelper/LangPack/", ini.GetValue("Main", "Language", "en_US"));
+    ll::i18n::MultiFileI18N i18n("./plugins/BackupHelper/lang/", ini.GetValue("Main", "Language", "en_US"));
     ll::i18n::getInstance() = std::make_unique<ll::i18n::MultiFileI18N>(i18n);
-    logger.info("BackupHelper loaded! Author: yqs112358, Ported by: ShrBox");
+    logger.info("BackupHelper loaded! Author: yqs112358, ported by: ShrBox"_tr());
     return true;
 }
 

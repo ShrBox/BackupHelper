@@ -28,6 +28,7 @@
 #define TEMP_DIR  "./plugins/BackupHelper/temp/"
 #define TEMP1_DIR "./plugins/BackupHelper/temp1/"
 #define ZIP_PATH  ".\\plugins\\BackupHelper\\7za.exe"
+using ll::i18n_literals::operator""_tr;
 
 bool                     isWorking = false;
 mce::UUID                playerUuid;
@@ -43,13 +44,13 @@ ll::schedule::GameTickScheduler scheduler;
 void ResumeBackup();
 
 void SuccessEnd() {
-    SendFeedback(playerUuid, "备份成功结束");
+    SendFeedback(playerUuid, "Backup ended successfully"_tr());
     playerUuid = mce::UUID::EMPTY;
     // The isWorking assignment here has been moved to line 321
 }
 
 void FailEnd(int code = -1) {
-    SendFeedback(playerUuid, std::string("备份失败！") + (code == -1 ? "" : "错误码：" + std::to_string(code)));
+    SendFeedback(playerUuid, "Failed to backup!"_tr() + (code == -1 ? "" : " Error code: {0}"_tr(code)));
     ResumeBackup();
     playerUuid = mce::UUID::EMPTY;
     isWorking  = false;
@@ -83,7 +84,7 @@ void ControlResourceUsage(HANDLE process) {
 void ClearOldBackup() {
     int days = ini.GetLongValue("Main", "MaxStorageTime", -1);
     if (days < 0) return;
-    SendFeedback(playerUuid, "备份最长保存时间：" + std::to_string(days) + "天");
+    SendFeedback(playerUuid, "Maximum backup retention time: {0} days"_tr(days));
 
     time_t       timeStamp = time(NULL) - days * 86400;
     std::wstring dirBackup = ll::string_utils::str2wstr(ini.GetValue("Main", "BackupPath", "backup"));
@@ -95,7 +96,7 @@ void ClearOldBackup() {
 
     HANDLE hFind = FindFirstFile(dirFind.c_str(), &findFileData);
     if (hFind == INVALID_HANDLE_VALUE) {
-        SendFeedback(playerUuid, "Fail to locate old backups.");
+        SendFeedback(playerUuid, "Fail to locate old backups."_tr());
         return;
     }
     do {
@@ -111,7 +112,7 @@ void ClearOldBackup() {
     } while (FindNextFile(hFind, &findFileData));
     FindClose(hFind);
 
-    if (clearCount > 0) SendFeedback(playerUuid, std::to_string(clearCount) + " old backups cleaned.");
+    if (clearCount > 0) SendFeedback(playerUuid, "{0} old backups cleaned."_tr(clearCount));
     return;
 }
 
@@ -121,8 +122,8 @@ void CleanTempDir() {
 }
 
 bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLength>& files) {
-    SendFeedback(playerUuid, "已抓取到BDS待备份文件清单。正在处理...");
-    SendFeedback(playerUuid, "正在复制文件...");
+    SendFeedback(playerUuid, "The list of files to be backed up has been captured. Processing..."_tr());
+    SendFeedback(playerUuid, "Copying files..."_tr());
 
     // Copy Files
     CleanTempDir();
@@ -137,7 +138,7 @@ bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLeng
         ec
     );
     if (ec.value() != 0) {
-        SendFeedback(playerUuid, "Failed to copy save files!\n" + ec.message());
+        SendFeedback(playerUuid, "Failed to copy save files! {0}"_tr(ec.message()));
         FailEnd(GetLastError());
         return false;
     }
@@ -161,13 +162,13 @@ bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLeng
 
         if (hSaveFile == INVALID_HANDLE_VALUE || !SetFilePointerEx(hSaveFile, pos, &curPos, FILE_BEGIN)
             || !SetEndOfFile(hSaveFile)) {
-            SendFeedback(playerUuid, "Failed to truncate " + toFile + "!");
+            SendFeedback(playerUuid, "Failed to truncate {0}!"_tr(toFile));
             FailEnd(GetLastError());
             return false;
         }
         CloseHandle(hSaveFile);
     }
-    SendFeedback(playerUuid, "压缩过程可能花费相当长的时间，请耐心等待");
+    SendFeedback(playerUuid, "The compression process may take quite some time, please be patient."_tr());
     return true;
 }
 
@@ -177,7 +178,8 @@ bool ZipFiles(const std::string& worldName) {
         char   timeStr[32];
         time_t nowtime;
         time(&nowtime);
-        struct tm* info = localtime(&nowtime);
+        struct tm* info;
+        localtime_s(info, &nowtime);
         strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H-%M-%S", info);
 
         std::string backupPath = ini.GetValue("Main", "BackupPath", "backup");
@@ -213,7 +215,7 @@ bool ZipFiles(const std::string& worldName) {
         sh.lpFile                = zipPath.c_str();
         sh.lpParameters          = paras;
         if (!ShellExecuteEx(&sh)) {
-            SendFeedback(playerUuid, "Fail to create Zip process!");
+            SendFeedback(playerUuid, "Fail to create Zip process!"_tr());
             FailEnd(GetLastError());
             return false;
         }
@@ -224,16 +226,16 @@ bool ZipFiles(const std::string& worldName) {
         // Wait
         DWORD res;
         if ((res = WaitForSingleObject(sh.hProcess, maxWait)) == WAIT_TIMEOUT || res == WAIT_FAILED) {
-            SendFeedback(playerUuid, "Zip process timeout!");
+            SendFeedback(playerUuid, "Zip process timeout!"_tr());
             FailEnd(GetLastError());
         }
         CloseHandle(sh.hProcess);
     } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(playerUuid, "Exception in zip process! Error Code:" + std::to_string(e.code().value()));
+        SendFeedback(playerUuid, "Exception in zip process! Error Code: {0}"_tr(e.code().value()));
         FailEnd(GetLastError());
         return false;
     } catch (const std::exception& e) {
-        SendFeedback(playerUuid, std::string("Exception in zip process!\n") + e.what());
+        SendFeedback(playerUuid, "Exception in zip process! {0}"_tr(e.what()));
         FailEnd(GetLastError());
         return false;
     }
@@ -269,7 +271,7 @@ bool UnzipFiles(const std::string& fileName) {
         sh.lpFile                = zipPath.c_str();
         sh.lpParameters          = paras;
         if (!ShellExecuteEx(&sh)) {
-            SendFeedback(playerUuid, "Fail to Unzip process!");
+            SendFeedback(playerUuid, "Fail to Unzip process!"_tr());
             // FailEnd(GetLastError());
             return false;
         }
@@ -280,16 +282,16 @@ bool UnzipFiles(const std::string& fileName) {
         // Wait
         DWORD res;
         if ((res = WaitForSingleObject(sh.hProcess, maxWait)) == WAIT_TIMEOUT || res == WAIT_FAILED) {
-            SendFeedback(playerUuid, "Unzip process timeout!");
+            SendFeedback(playerUuid, "Unzip process timeout!"_tr());
             // FailEnd(GetLastError());
         }
         CloseHandle(sh.hProcess);
     } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(playerUuid, "Exception in unzip process! Error Code:" + std::to_string(e.code().value()));
+        SendFeedback(playerUuid, "Exception in unzip process! Error Code: {0}"_tr(e.code().value()));
         // FailEnd(GetLastError());
         return false;
     } catch (const std::exception& e) {
-        SendFeedback(playerUuid, std::string("Exception in unzip process!\n") + e.what());
+        SendFeedback(playerUuid, "Exception in unzip process! {0}"_tr(e.what()));
         // FailEnd(GetLastError());
         return false;
     }
@@ -344,7 +346,7 @@ bool CopyRecoverFile(const std::string& worldName) {
 }
 
 bool StartBackup() {
-    SendFeedback(playerUuid, "备份已启动");
+    SendFeedback(playerUuid, "Backup process has been started"_tr());
     isWorking = true;
     ClearOldBackup();
     CommandContext context = CommandContext(
@@ -364,24 +366,33 @@ bool StartBackup() {
 }
 
 bool StartRecover(int recover_NUM) {
-    SendFeedback(playerUuid, "回档前准备已启动");
+    SendFeedback(playerUuid, "Preparation before rollback has been started"_tr());
     if (backupList.empty()) {
-        SendFeedback(playerUuid, "插件内部存档列表为空，请使用list子指令后再试");
+        SendFeedback(
+            playerUuid,
+            "The internal archive list of the plugin is empty, please use the list subcommand and try again."_tr()
+        );
         return false;
     }
     unsigned int i = recover_NUM + 1;
     if (i > backupList.size()) {
-        SendFeedback(playerUuid, "存档选择参数不在已有存档数内，请重新选择");
+        SendFeedback(
+            playerUuid,
+            "The archive selection parameters are not within the number of existing archives, please select again."_tr()
+        );
         return false;
     }
     isWorking = true;
-    SendFeedback(playerUuid, "正在进行回档文件解压复制");
+    SendFeedback(playerUuid, "The archive file is being decompressed and copied."_tr());
     if (!UnzipFiles(backupList[recover_NUM])) {
-        SendFeedback(playerUuid, "回档文件准备失败");
+        SendFeedback(playerUuid, "Rollback file preparation failed"_tr());
         isWorking = false;
         return false;
     };
-    SendFeedback(playerUuid, "回档文件准备完成,即将进行回档前备份");
+    SendFeedback(
+        playerUuid,
+        "The rollback file preparation is completed and the backup before rollback is about to be carried out"_tr()
+    );
     CommandContext context = CommandContext(
         "save hold",
         std::make_unique<ServerCommandOrigin>(
@@ -389,7 +400,11 @@ bool StartRecover(int recover_NUM) {
         )
     );
     ll::service::getMinecraft()->getCommands().executeCommand(context, false);
-    SendFeedback(playerUuid, "回档准备已完成，重启可回档,使用backup cancel指令可取消回档");
+    SendFeedback(
+        playerUuid,
+        "The rollback preparation has been completed. You can rollback by restarting. You can cancel the rollback by using the /backup cancel command."_tr(
+        )
+    ); // 回档准备已完成，重启可回档，使用 /backup cancel指令可取消回档
     backupList.clear();
     return true;
 }
@@ -418,13 +433,13 @@ void ResumeBackup() {
             }
         }
         if (!output.getSuccessCount()) {
-            SendFeedback(playerUuid, "Failed to resume backup snapshot!");
+            SendFeedback(playerUuid, "Failed to resume backup snapshot!"_tr());
             scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(RETRY_TICKS), ResumeBackup);
         } else {
             SendFeedback(playerUuid, outputStr);
         }
     } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(playerUuid, "Failed to resume backup snapshot! Error Code:" + std::to_string(e.code().value()));
+        SendFeedback(playerUuid, "Failed to resume backup snapshot! Error Code: {0}"_tr(e.code().value()));
         if (isWorking) scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(RETRY_TICKS), ResumeBackup);
     }
 }
