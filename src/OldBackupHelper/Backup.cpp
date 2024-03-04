@@ -176,11 +176,10 @@ bool ZipFiles(const std::string& worldName) {
     try {
         // Get Name
         char   timeStr[32];
-        time_t nowtime;
-        time(&nowtime);
-        struct tm* info;
-        localtime_s(info, &nowtime);
-        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H-%M-%S", info);
+        time_t nowtime = time(0);
+        tm     info;
+        localtime_s(&info, &nowtime);
+        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H-%M-%S", &info);
 
         std::string backupPath = ini.GetValue("Main", "BackupPath", "backup");
         int         level      = ini.GetLongValue("Main", "Compress", 0);
@@ -231,7 +230,7 @@ bool ZipFiles(const std::string& worldName) {
         }
         CloseHandle(sh.hProcess);
     } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(playerUuid, "Exception in zip process! Error Code: {0}"_tr(e.code().value()));
+        SendFeedback(playerUuid, "Exception in zip process! Error Code: {0}"_tr(e.code().value()) + ' ' + e.what());
         FailEnd(GetLastError());
         return false;
     } catch (const std::exception& e) {

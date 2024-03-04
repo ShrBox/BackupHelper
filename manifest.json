@@ -1,5 +1,8 @@
 {
     "name": "${pluginName}",
     "entry": "${pluginFile}",
-    "type": "native"
+    "type": "native",
+    "description": "A LeviLamina plugin which is port from LiteLoaderBDS to help you backup more easily",
+    "author": "yqs112358 & ShrBox",
+    "version": "0.1.5"
 }
