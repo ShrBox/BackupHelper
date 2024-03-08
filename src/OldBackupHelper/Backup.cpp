@@ -27,7 +27,7 @@
 
 #define TEMP_DIR  "./plugins/BackupHelper/temp/"
 #define TEMP1_DIR "./plugins/BackupHelper/temp1/"
-#define ZIP_PATH  ".\\plugins\\BackupHelper\\7za.exe"
+#define ZIP_PATH  "./7za.exe"
 using ll::i18n_literals::operator""_tr;
 
 bool                     isWorking = false;
