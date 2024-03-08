@@ -12,7 +12,7 @@
         ]
     },
     "asset_url": "https://github.com/ShrBox/BackupHelper/releases/download/v0.1.5/BackupHelper-windows-x64.zip",
-    "requirements": {
+    "dependencies": {
         "gitea.litebds.com/ShrBox/7-zip": "23.*"
     },
     "prerequisites": {
