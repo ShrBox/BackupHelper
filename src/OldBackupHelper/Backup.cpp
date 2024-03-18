@@ -6,6 +6,7 @@
 #include "ll/api/utils/ErrorUtils.h"
 #include "mc/deps/core/mce/UUID.h"
 #include <filesystem>
+#include <ll/api/i18n/I18n.h>
 #include <ll/api/memory/Hook.h>
 #include <ll/api/schedule/Scheduler.h>
 #include <mc/deps/core/string/HashedString.h>
@@ -22,6 +23,7 @@
 #include <shellapi.h>
 #include <string>
 #include <thread>
+
 
 #pragma comment(lib, "Shell32.lib")
 
