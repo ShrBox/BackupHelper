@@ -1,7 +1,7 @@
 {
     "format_version": 2,
     "tooth": "github.com/ShrBox/BackupHelper",
-    "version": "0.1.8",
+    "version": "0.2.0",
     "info": {
         "name": "BackupHelper",
         "description": "A LeviLamina plugin which is port from LiteLoaderBDS to help you backup more easily",
@@ -11,12 +11,12 @@
             "plugin"
         ]
     },
-    "asset_url": "https://github.com/ShrBox/BackupHelper/releases/download/v0.1.8/BackupHelper-windows-x64.zip",
+    "asset_url": "https://github.com/ShrBox/BackupHelper/releases/download/v0.2.0/BackupHelper-windows-x64.zip",
     "dependencies": {
         "gitea.litebds.com/ShrBox/7-zip": "23.x"
     },
     "prerequisites": {
-        "github.com/LiteLDev/LeviLamina": ">=0.9.5 <0.10.0"
+        "github.com/LiteLDev/LeviLamina": "0.10.x"
     },
     "files": {
         "place": [
