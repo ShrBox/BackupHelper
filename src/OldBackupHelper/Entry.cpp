@@ -6,6 +6,8 @@
 #include "ConfigFile.h"
 #include "ll/api/i18n/I18n.h"
 #include "ll/api/memory/Hook.h"
+#include "ll/api/plugin/NativePlugin.h"
+#include "ll/api/plugin/RegisterHelper.h"
 #include "ll/api/service/Bedrock.h"
 #include <fmt/format.h>
 #include <functional>
@@ -19,12 +21,9 @@
 #include <memory>
 #include <stdexcept>
 
+
 CSimpleIniA ini;
 using ll::i18n_literals::operator""_tr;
-
-namespace BackupHelper {
-
-namespace {
 
 // 存档开始加载前替换存档文件
 LL_AUTO_TYPE_INSTANCE_HOOK(
@@ -53,20 +52,30 @@ bool Raw_IniOpen(const magic_enum::string& path, const std::string& defContent) 
     ini.SetUnicode(true);
     auto res = ini.LoadFile(path.c_str());
     if (res < 0) {
-        BackupHelper::getSelfPluginInstance().getLogger().error("Failed to open configuration file!"_tr());
+        backup_helper::BackupHelper::getInstance().getSelf().getLogger().error("Failed to open configuration file!"_tr()
+        );
         return false;
     } else {
         return true;
     }
 }
 
-std::unique_ptr<std::reference_wrapper<ll::plugin::NativePlugin>>
-    selfPluginInstance; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+namespace backup_helper {
 
-auto disable(ll::plugin::NativePlugin& /*self*/) -> bool { return true; }
+static std::unique_ptr<BackupHelper> instance;
 
-auto enable(ll::plugin::NativePlugin& self) -> bool {
-    auto& logger = self.getLogger();
+BackupHelper& BackupHelper::getInstance() { return *instance; }
+
+bool BackupHelper::load() {
+    getSelf().getLogger().info("Loading...");
+    // Code for loading the plugin goes here.
+    return true;
+}
+
+bool BackupHelper::enable() {
+    getSelf().getLogger().info("Enabling...");
+    // Code for enabling the plugin goes here.
+    auto& logger = getSelf().getLogger();
     RegisterCommand();
     ll::event::EventBus::getInstance().emplaceListener<ll::event::ExecutingCommandEvent>(
         [&logger](ll::event::ExecutingCommandEvent& ev) {
@@ -82,39 +91,16 @@ auto enable(ll::plugin::NativePlugin& self) -> bool {
     return true;
 }
 
-auto load(ll::plugin::NativePlugin& self) -> bool {
-    auto& logger       = self.getLogger();
-    selfPluginInstance = std::make_unique<std::reference_wrapper<ll::plugin::NativePlugin>>(self);
+bool BackupHelper::disable() {
+    getSelf().getLogger().info("Disabling...");
+    // Code for disabling the plugin goes here.
     Raw_IniOpen(_CONFIG_FILE, "");
     ll::i18n::MultiFileI18N i18n("./plugins/BackupHelper/lang/", ini.GetValue("Main", "Language", "en_US"));
     ll::i18n::getInstance() = std::make_unique<ll::i18n::MultiFileI18N>(i18n);
-    logger.info("BackupHelper loaded! Author: yqs112358, ported by: ShrBox"_tr());
+    getSelf().getLogger().info("BackupHelper loaded! Author: yqs112358, ported by: ShrBox"_tr());
     return true;
 }
 
-auto unload(ll::plugin::NativePlugin& self) -> bool { return true; }
+} // namespace backup_helper
 
-} // namespace
-
-auto getSelfPluginInstance() -> ll::plugin::NativePlugin& {
-    if (!selfPluginInstance) {
-        throw std::runtime_error("selfPluginInstance is null");
-    }
-
-    return *selfPluginInstance;
-}
-
-} // namespace BackupHelper
-
-extern "C" {
-_declspec(dllexport) auto ll_plugin_disable(ll::plugin::NativePlugin& self) -> bool {
-    return BackupHelper::disable(self);
-}
-_declspec(dllexport) auto ll_plugin_enable(ll::plugin::NativePlugin& self) -> bool {
-    return BackupHelper::enable(self);
-}
-_declspec(dllexport) auto ll_plugin_load(ll::plugin::NativePlugin& self) -> bool { return BackupHelper::load(self); }
-_declspec(dllexport) auto ll_plugin_unload(ll::plugin::NativePlugin& self) -> bool {
-    return BackupHelper::unload(self);
-}
-}
+LL_REGISTER_PLUGIN(backup_helper::BackupHelper, backup_helper::instance);

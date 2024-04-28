@@ -11,6 +11,7 @@
 #include <ll/api/schedule/Scheduler.h>
 #include <mc/deps/core/string/HashedString.h>
 #include <mc/locale/I18n.h>
+#include <mc/locale/Localization.h>
 #include <mc/server/commands/CommandContext.h>
 #include <mc/server/commands/CommandOutput.h>
 #include <mc/server/commands/MinecraftCommands.h>
@@ -410,6 +411,8 @@ bool StartRecover(int recover_NUM) {
     return true;
 }
 
+I18n& getI18n(); // Please remove it after 0.12.1 released
+
 #define RETRY_TICKS 60
 
 void ResumeBackup() {
@@ -427,7 +430,9 @@ void ResumeBackup() {
         if (command) {
             command->run(origin, output);
             for (auto msg : output.getMessages()) {
-                outputStr = outputStr.append(I18n::get(msg.getMessageId(), msg.getParams())).append("\n");
+                std::string temp;
+                getI18n().getCurrentLanguage()->get(msg.getMessageId(), temp, msg.getParams());
+                outputStr += temp.append("\n");
             }
             if (output.getMessages().size()) {
                 outputStr.pop_back();

@@ -24,7 +24,7 @@ inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
         extern mce::UUID playerUuid;
         playerUuid = uuid;
     }
-    if (!found || uuid.isEmpty()) BackupHelper::getSelfPluginInstance().getLogger().info(msg);
+    if (!found || uuid.isEmpty()) backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
     else {
         try {
             // p->sendTextPacket("§e[BackupHelper]§r " + msg, TextType::RAW);
@@ -32,11 +32,11 @@ inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
         } catch (const ll::error_utils::seh_exception&) {
             extern mce::UUID playerUuid;
             playerUuid = mce::UUID::EMPTY;
-            BackupHelper::getSelfPluginInstance().getLogger().info(msg);
+            backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
         } catch (const std::exception&) {
             extern mce::UUID playerUuid;
             playerUuid = mce::UUID::EMPTY;
-            BackupHelper::getSelfPluginInstance().getLogger().info(msg);
+            backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
         }
     }
 }

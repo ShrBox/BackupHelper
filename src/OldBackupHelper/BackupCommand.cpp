@@ -109,44 +109,43 @@ void RegisterCommand() {
                         .getOrCreateCommand("backup", "Create a backup"_tr(), CommandPermissionLevel::GameDirectors);
     command.overload<BackupMainCommand>()
         .optional("backupOperation")
-        .execute<
-            [&](CommandOrigin const& origin, CommandOutput& output, BackupMainCommand const& param, Command const&) {
-                if (!param.backupOperation) {
-                    CmdBackup(
-                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY
-                    );
-                    return;
-                }
-                switch (param.backupOperation) {
-                case BackupOperation::reload:
-                    CmdReloadConfig(
-                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY
-                    );
-                    break;
-                case BackupOperation::cancel:
-                    CmdCancel(
-                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY
-                    );
-                    break;
-                case BackupOperation::list:
-                    CmdListBackup(
-                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY,
-                        100
-                    );
-                    break;
-                default:
-                    output.error("Unknown operation");
-                    break;
-                }
-            }>();
+        .execute([&](CommandOrigin const&     origin,
+                     CommandOutput&           output,
+                     BackupMainCommand const& param,
+                     Command const&) {
+            if (!param.backupOperation) {
+                CmdBackup(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY);
+                return;
+            }
+            switch (param.backupOperation) {
+            case BackupOperation::reload:
+                CmdReloadConfig(
+                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY
+                );
+                break;
+            case BackupOperation::cancel:
+                CmdCancel(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY);
+                break;
+            case BackupOperation::list:
+                CmdListBackup(
+                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY,
+                    100
+                );
+                break;
+            default:
+                output.error("Unknown operation");
+                break;
+            }
+        });
     command.overload<BackupRecoverCommand>()
         .text("recover")
         .required("recoverNumber")
-        .execute<
+        .execute(
             [&](CommandOrigin const& origin, CommandOutput& output, BackupRecoverCommand const& param, Command const&) {
                 CmdRecoverBefore(
                     origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY,
                     param.recoverNumber
                 );
-            }>();
+            }
+        );
 }
