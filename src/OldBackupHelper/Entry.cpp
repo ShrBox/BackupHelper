@@ -69,6 +69,10 @@ BackupHelper& BackupHelper::getInstance() { return *instance; }
 bool BackupHelper::load() {
     getSelf().getLogger().info("Loading...");
     // Code for loading the plugin goes here.
+    Raw_IniOpen(_CONFIG_FILE, "");
+    ll::i18n::load("./plugins/BackupHelper/lang/");
+    ll::i18n::getInstance()->mDefaultLocaleName = ini.GetValue("Main", "Language", "en_US");
+    getSelf().getLogger().info("BackupHelper loaded! Author: yqs112358, ported by: ShrBox"_tr());
     return true;
 }
 
@@ -94,10 +98,6 @@ bool BackupHelper::enable() {
 bool BackupHelper::disable() {
     getSelf().getLogger().info("Disabling...");
     // Code for disabling the plugin goes here.
-    Raw_IniOpen(_CONFIG_FILE, "");
-    ll::i18n::MultiFileI18N i18n("./plugins/BackupHelper/lang/", ini.GetValue("Main", "Language", "en_US"));
-    ll::i18n::getInstance() = std::make_unique<ll::i18n::MultiFileI18N>(i18n);
-    getSelf().getLogger().info("BackupHelper loaded! Author: yqs112358, ported by: ShrBox"_tr());
     return true;
 }
 
