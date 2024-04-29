@@ -411,8 +411,6 @@ bool StartRecover(int recover_NUM) {
     return true;
 }
 
-I18n& getI18n(); // Please remove it after 0.12.1 released
-
 #define RETRY_TICKS 60
 
 void ResumeBackup() {
