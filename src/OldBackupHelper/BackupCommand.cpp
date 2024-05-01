@@ -113,10 +113,6 @@ void RegisterCommand() {
                      CommandOutput&           output,
                      BackupMainCommand const& param,
                      Command const&) {
-            if (!param.backupOperation) {
-                CmdBackup(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY);
-                return;
-            }
             switch (param.backupOperation) {
             case BackupOperation::reload:
                 CmdReloadConfig(
@@ -133,7 +129,7 @@ void RegisterCommand() {
                 );
                 break;
             default:
-                output.error("Unknown operation");
+                CmdBackup(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY);
                 break;
             }
         });
