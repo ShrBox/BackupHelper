@@ -330,21 +330,26 @@ bool CopyRecoverFile(const std::string& worldName) {
     // 先重名原来存档，再复制回档文件
     auto file_status1 = std::filesystem::status("./worlds/" + worldName, error);
     if (error) return false;
-    if (std::filesystem::exists(file_status1) && std::filesystem::exists(file_status)) {
-        std::filesystem::rename("./worlds/" + worldName, "./worlds/" + worldName + "_bak");
-    } else {
-        return false;
-    }
-    std::filesystem::copy(TEMP1_DIR, "./worlds", std::filesystem::copy_options::recursive, error);
-    if (error.value() != 0) {
-        SendFeedback(playerUuid, "Failed to copy files!\n" + error.message());
+    try {
+        if (std::filesystem::exists(file_status1) && std::filesystem::exists(file_status)) {
+            std::filesystem::rename("./worlds/" + worldName, "./worlds/" + worldName + "_bak");
+        } else {
+            return false;
+        }
+        std::filesystem::copy(TEMP1_DIR, "./worlds", std::filesystem::copy_options::recursive, error);
+        if (error.value() != 0) {
+            SendFeedback(playerUuid, "Failed to copy files!\n" + error.message());
+            std::filesystem::remove_all(TEMP1_DIR);
+            std::filesystem::rename("./worlds/" + worldName + "_bak", "./worlds/" + worldName);
+            return false;
+        }
         std::filesystem::remove_all(TEMP1_DIR);
-        std::filesystem::rename("./worlds/" + worldName + "_bak", "./worlds/" + worldName);
+        std::filesystem::remove_all("./worlds/" + worldName + "_bak");
+        return true;
+    } catch (...) {
+        ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
         return false;
     }
-    std::filesystem::remove_all(TEMP1_DIR);
-    std::filesystem::remove_all("./worlds/" + worldName + "_bak");
-    return true;
 }
 
 bool StartBackup() {
