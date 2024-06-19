@@ -4,22 +4,25 @@
 #include "Backup.h"
 #include "BackupCommand.h"
 #include "ConfigFile.h"
+#include "ll/api/Expected.h"
 #include "ll/api/i18n/I18n.h"
 #include "ll/api/memory/Hook.h"
 #include "ll/api/plugin/NativePlugin.h"
 #include "ll/api/plugin/RegisterHelper.h"
 #include "ll/api/service/Bedrock.h"
+#include "mc/server/commands/CommandOrigin.h"
 #include <fmt/format.h>
-#include <functional>
 #include <ll/api/Config.h>
 #include <ll/api/event/EventBus.h>
 #include <ll/api/event/command/ExecuteCommandEvent.h>
+#include <ll/api/event/server/ServerStoppingEvent.h>
 #include <ll/api/io/FileUtils.h>
 #include <ll/api/plugin/NativePlugin.h>
 #include <ll/api/plugin/PluginManagerRegistry.h>
+#include <ll/api/service/ServerInfo.h>
 #include <mc/server/common/PropertiesSettings.h>
+#include <mc/server/common/commands/StopCommand.h>
 #include <memory>
-#include <stdexcept>
 
 
 CSimpleIniA ini;
@@ -36,6 +39,24 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
 ) {
     RecoverWorld();
     origin(filename);
+}
+
+LL_AUTO_TYPE_INSTANCE_HOOK(
+    StopCommandHook,
+    ll::memory::HookPriority::Normal,
+    StopCommand,
+    "?execute@StopCommand@@UEBAXAEBVCommandOrigin@@AEAVCommandOutput@@@Z",
+    void,
+    CommandOrigin const& commandOrigin,
+    CommandOutput&       output
+) {
+    if (GetIsWorking()) {
+        backup_helper::BackupHelper::getInstance().getSelf().getLogger().error(
+            "Don't execute stop command when backup"_tr()
+        );
+        return;
+    }
+    origin(commandOrigin, output);
 }
 
 bool Raw_IniOpen(const magic_enum::string& path, const std::string& defContent) {
@@ -81,17 +102,6 @@ bool BackupHelper::enable() {
     // Code for enabling the plugin goes here.
     auto& logger = getSelf().getLogger();
     RegisterCommand();
-    ll::event::EventBus::getInstance().emplaceListener<ll::event::ExecutingCommandEvent>(
-        [&logger](ll::event::ExecutingCommandEvent& ev) {
-            std::string cmd = ev.commandContext().mCommand;
-            if (cmd.starts_with("/")) {
-                cmd.erase(0, 1);
-            }
-            if (cmd == "stop" && GetIsWorking()) {
-                logger.error("Don't execute stop command when backup"_tr());
-            }
-        }
-    );
     return true;
 }
 
