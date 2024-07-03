@@ -132,6 +132,7 @@ void RegisterCommand() {
                 CmdBackup(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY);
                 break;
             }
+            output.success();
         });
     command.overload<BackupRecoverCommand>()
         .text("recover")
@@ -142,6 +143,7 @@ void RegisterCommand() {
                     origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY,
                     param.recoverNumber
                 );
+                output.success();
             }
         );
 }
