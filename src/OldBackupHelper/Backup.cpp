@@ -1,5 +1,6 @@
 #include "Backup.h"
-#include "ConfigFile.h"
+#include "Entry.h"
+#include "OldBackupHelper/Entry.h"
 #include "Tools.h"
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/schedule/Task.h"
@@ -28,9 +29,9 @@
 
 #pragma comment(lib, "Shell32.lib")
 
-#define TEMP_DIR  "./plugins/BackupHelper/temp/"
-#define TEMP1_DIR "./plugins/BackupHelper/temp1/"
-#define ZIP_PATH  "7za.exe"
+#define TEMP_DIR  backup_helper::BackupHelper::getInstance().getSelf().getModDir() / "temp"
+#define TEMP1_DIR backup_helper::BackupHelper::getInstance().getSelf().getModDir() / "temp1"
+#define ZIP_PATH  "./7za.exe"
 using ll::i18n_literals::operator""_tr;
 
 bool                     isWorking = false;
@@ -85,13 +86,14 @@ void ControlResourceUsage(HANDLE process) {
 }
 
 void ClearOldBackup() {
-    int days = ini.GetLongValue("Main", "MaxStorageTime", -1);
+    int days = backup_helper::getConfig().GetLongValue("Main", "MaxStorageTime", -1);
     if (days < 0) return;
     SendFeedback(playerUuid, "Maximum backup retention time: {0} days"_tr(days));
 
     time_t       timeStamp = time(NULL) - days * 86400;
-    std::wstring dirBackup = ll::string_utils::str2wstr(ini.GetValue("Main", "BackupPath", "backup"));
-    std::wstring dirFind   = dirBackup + L"\\*";
+    std::wstring dirBackup =
+        ll::string_utils::str2wstr(backup_helper::getConfig().GetValue("Main", "BackupPath", "backup"));
+    std::wstring dirFind = dirBackup + L"\\*";
 
     WIN32_FIND_DATA findFileData;
     ULARGE_INTEGER  createTime;
@@ -134,12 +136,7 @@ bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLeng
     std::filesystem::create_directories(TEMP_DIR, ec);
     ec.clear();
 
-    std::filesystem::copy(
-        ll::string_utils::str2wstr("./worlds/" + worldName),
-        ll::string_utils::str2wstr(TEMP_DIR + worldName),
-        std::filesystem::copy_options::recursive,
-        ec
-    );
+    std::filesystem::copy("./worlds/" + worldName, TEMP_DIR / worldName, std::filesystem::copy_options::recursive, ec);
     if (ec.value() != 0) {
         SendFeedback(playerUuid, "Failed to copy save files! {0}"_tr(ec.message()));
         FailEnd(GetLastError());
@@ -148,7 +145,7 @@ bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLeng
 
     // Truncate
     for (auto& file : files) {
-        std::string toFile = TEMP_DIR + file.path;
+        std::string toFile = (TEMP_DIR / file.path).string();
 
         LARGE_INTEGER pos;
         pos.QuadPart = file.size;
@@ -184,18 +181,18 @@ bool ZipFiles(const std::string& worldName) {
         localtime_s(&info, &nowtime);
         strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H-%M-%S", &info);
 
-        std::string backupPath = ini.GetValue("Main", "BackupPath", "backup");
-        int         level      = ini.GetLongValue("Main", "Compress", 0);
+        std::string backupPath = backup_helper::getConfig().GetValue("Main", "BackupPath", "backup");
+        int         level      = backup_helper::getConfig().GetLongValue("Main", "Compress", 0);
 
         // Prepare command line
         char tmpParas[_MAX_PATH * 4] = {0};
         sprintf(
             tmpParas,
-            "a \"%s\\%s_%s.7z\" \"%s%s\" -sdel -mx%d -mmt",
+            "a \"%s\\%s_%s.7z\" \"%ls%s\" -sdel -mx%d -mmt",
             backupPath.c_str(),
             worldName.c_str(),
             timeStr,
-            TEMP_DIR,
+            (TEMP_DIR).c_str(),
             worldName.c_str(),
             level
         );
@@ -203,7 +200,7 @@ bool ZipFiles(const std::string& worldName) {
         wchar_t paras[_MAX_PATH * 4] = {0};
         ll::string_utils::str2wstr(tmpParas).copy(paras, strlen(tmpParas), 0);
 
-        DWORD maxWait = ini.GetLongValue("Main", "MaxWaitForZip", 0);
+        DWORD maxWait = backup_helper::getConfig().GetLongValue("Main", "MaxWaitForZip", 0);
         if (maxWait <= 0) maxWait = 0xFFFFFFFF;
         else maxWait *= 1000;
 
@@ -248,18 +245,18 @@ bool UnzipFiles(const std::string& fileName) {
     try {
         // Get Name
 
-        std::string backupPath = ini.GetValue("Main", "BackupPath", "backup");
-        int         level      = ini.GetLongValue("Main", "Compress", 0);
+        std::string backupPath = backup_helper::getConfig().GetValue("Main", "BackupPath", "backup");
+        int         level      = backup_helper::getConfig().GetLongValue("Main", "Compress", 0);
 
         // Prepare command line
         char tmpParas[_MAX_PATH * 4] = {0};
-        sprintf(tmpParas, "x \"%s\\%s\" -o%s", backupPath.c_str(), fileName.c_str(), TEMP1_DIR);
+        sprintf(tmpParas, "x \"%s\\%s\" -o%ls", backupPath.c_str(), fileName.c_str(), (TEMP1_DIR).c_str());
 
         wchar_t paras[_MAX_PATH * 4] = {0};
         ll::string_utils::str2wstr(tmpParas).copy(paras, strlen(tmpParas), 0);
         std::filesystem::remove_all(TEMP1_DIR);
 
-        DWORD maxWait = ini.GetLongValue("Main", "MaxWaitForZip", 0);
+        DWORD maxWait = backup_helper::getConfig().GetLongValue("Main", "MaxWaitForZip", 0);
         if (maxWait <= 0) maxWait = 0xFFFFFFFF;
         else maxWait *= 1000;
 
@@ -297,13 +294,13 @@ bool UnzipFiles(const std::string& fileName) {
         // FailEnd(GetLastError());
         return false;
     }
-    ini.SetBoolValue("BackFile", "isBack", true);
-    ini.SaveFile(_CONFIG_FILE);
+    backup_helper::getConfig().SetBoolValue("BackFile", "isBack", true);
+    backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
     return true;
 }
 
 std::vector<std::string> getAllBackup() {
-    std::string                      backupPath = ini.GetValue("Main", "BackupPath", "backup");
+    std::string                      backupPath = backup_helper::getConfig().GetValue("Main", "BackupPath", "backup");
     std::filesystem::directory_entry entry(backupPath);
     std::regex                       isBackFile(".*7z");
     std::vector<std::string>         backupList;
@@ -322,7 +319,7 @@ std::vector<std::string> getAllBackup() {
 bool CopyRecoverFile(const std::string& worldName) {
     std::error_code error;
     // 判断回档文件存在
-    auto file_status = std::filesystem::status(TEMP1_DIR + worldName, error);
+    auto file_status = std::filesystem::status(TEMP1_DIR / worldName, error);
     if (error) return false;
     if (!std::filesystem::exists(file_status)) return false;
 
@@ -466,8 +463,8 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     bool               idk
 ) {
     if (isWorking) {
-        ini.SetValue("BackFile", "worldName", worldName.c_str());
-        ini.SaveFile(_CONFIG_FILE);
+        backup_helper::getConfig().SetValue("BackFile", "worldName", worldName.c_str());
+        backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
         auto files = origin(worldName, idk);
         if (CopyFiles(worldName, files)) {
             std::thread([worldName]() {

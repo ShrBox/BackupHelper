@@ -1,32 +1,68 @@
 #include "Entry.h"
-#include <SimpleIni.h>
 
 #include "Backup.h"
 #include "BackupCommand.h"
-#include "ConfigFile.h"
 #include "ll/api/Expected.h"
 #include "ll/api/i18n/I18n.h"
 #include "ll/api/memory/Hook.h"
-#include "ll/api/plugin/NativePlugin.h"
-#include "ll/api/plugin/RegisterHelper.h"
+#include "ll/api/mod/RegisterHelper.h"
 #include "ll/api/service/Bedrock.h"
 #include "mc/server/commands/CommandOrigin.h"
-#include <fmt/format.h>
-#include <ll/api/Config.h>
-#include <ll/api/event/EventBus.h>
-#include <ll/api/event/command/ExecuteCommandEvent.h>
-#include <ll/api/event/server/ServerStoppingEvent.h>
-#include <ll/api/io/FileUtils.h>
-#include <ll/api/plugin/NativePlugin.h>
-#include <ll/api/plugin/PluginManagerRegistry.h>
-#include <ll/api/service/ServerInfo.h>
-#include <mc/server/common/PropertiesSettings.h>
-#include <mc/server/common/commands/StopCommand.h>
+#include "mc/server/common/PropertiesSettings.h"
+#include "mc/server/common/commands/StopCommand.h"
+#include <filesystem>
+#include <magic_enum.hpp>
 #include <memory>
 
+using ll::i18n_literals::operator""_tr;
+
+namespace backup_helper {
 
 CSimpleIniA ini;
-using ll::i18n_literals::operator""_tr;
+
+std::filesystem::path getConfigPath() { return BackupHelper::getInstance().getSelf().getModDir() / "config.ini"; }
+CSimpleIniA&          getConfig() { return ini; }
+
+bool Raw_IniOpen(const magic_enum::string& path, const std::string& defContent) {
+    if (!std::filesystem::exists(path)) {
+        // 创建新的
+        std::filesystem::create_directories(std::filesystem::path(path).remove_filename().u8string());
+
+        std::ofstream iniFile(path);
+        if (iniFile.is_open() && defContent != "") iniFile << defContent;
+        iniFile.close();
+    }
+
+    // 已存在
+    backup_helper::getConfig().SetUnicode(true);
+    auto res = backup_helper::getConfig().LoadFile(path.c_str());
+    if (res < 0) {
+        backup_helper::BackupHelper::getInstance().getSelf().getLogger().error("Failed to open configuration file!"_tr()
+        );
+        return false;
+    } else {
+        return true;
+    }
+}
+
+static std::unique_ptr<BackupHelper> instance;
+
+BackupHelper& BackupHelper::getInstance() { return *instance; }
+
+bool BackupHelper::load() {
+    Raw_IniOpen(getConfigPath().string(), "");
+    ll::i18n::load(getSelf().getLangDir());
+    ll::i18n::getInstance()->mDefaultLocaleName = ini.GetValue("Main", "Language", "en_US");
+    getSelf().getLogger().info("BackupHelper loaded! Author: yqs112358, ported by: ShrBox"_tr());
+    return true;
+}
+
+bool BackupHelper::enable() {
+    RegisterCommand();
+    return true;
+}
+
+bool BackupHelper::disable() { return true; }
 
 // 存档开始加载前替换存档文件
 LL_AUTO_TYPE_INSTANCE_HOOK(
@@ -59,58 +95,6 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     origin(commandOrigin, output);
 }
 
-bool Raw_IniOpen(const magic_enum::string& path, const std::string& defContent) {
-    if (!std::filesystem::exists(path)) {
-        // 创建新的
-        std::filesystem::create_directories(std::filesystem::path(path).remove_filename().u8string());
-
-        std::ofstream iniFile(path);
-        if (iniFile.is_open() && defContent != "") iniFile << defContent;
-        iniFile.close();
-    }
-
-    // 已存在
-    ini.SetUnicode(true);
-    auto res = ini.LoadFile(path.c_str());
-    if (res < 0) {
-        backup_helper::BackupHelper::getInstance().getSelf().getLogger().error("Failed to open configuration file!"_tr()
-        );
-        return false;
-    } else {
-        return true;
-    }
-}
-
-namespace backup_helper {
-
-static std::unique_ptr<BackupHelper> instance;
-
-BackupHelper& BackupHelper::getInstance() { return *instance; }
-
-bool BackupHelper::load() {
-    getSelf().getLogger().info("Loading...");
-    // Code for loading the plugin goes here.
-    Raw_IniOpen(_CONFIG_FILE, "");
-    ll::i18n::load("./plugins/BackupHelper/lang/");
-    ll::i18n::getInstance()->mDefaultLocaleName = ini.GetValue("Main", "Language", "en_US");
-    getSelf().getLogger().info("BackupHelper loaded! Author: yqs112358, ported by: ShrBox"_tr());
-    return true;
-}
-
-bool BackupHelper::enable() {
-    getSelf().getLogger().info("Enabling...");
-    // Code for enabling the plugin goes here.
-    auto& logger = getSelf().getLogger();
-    RegisterCommand();
-    return true;
-}
-
-bool BackupHelper::disable() {
-    getSelf().getLogger().info("Disabling...");
-    // Code for disabling the plugin goes here.
-    return true;
-}
-
 } // namespace backup_helper
 
-LL_REGISTER_PLUGIN(backup_helper::BackupHelper, backup_helper::instance);
+LL_REGISTER_MOD(backup_helper::BackupHelper, backup_helper::instance);

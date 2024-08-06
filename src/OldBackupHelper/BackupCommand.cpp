@@ -1,6 +1,5 @@
 #include "BackupCommand.h"
 #include "Backup.h"
-#include "ConfigFile.h"
 #include "Tools.h"
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/i18n/I18n.h"
@@ -19,8 +18,8 @@ extern ll::schedule::GameTickScheduler scheduler;
 using ll::i18n_literals::operator""_tr;
 
 void CmdReloadConfig(mce::UUID uuid) {
-    ini.Reset();
-    auto res = ini.LoadFile(_CONFIG_FILE);
+    backup_helper::getConfig().Reset();
+    auto res = backup_helper::getConfig().LoadFile(backup_helper::getConfigPath().c_str());
     if (res < 0) {
         SendFeedback(uuid, "Failed to open Config File!"_tr());
     } else {
@@ -45,10 +44,10 @@ void CmdCancel(mce::UUID uuid) {
     } else {
         SendFeedback(uuid, "No backup is working now."_tr());
     }
-    if (ini.GetBoolValue("BackFile", "isBack", false)) {
-        ini.SetBoolValue("BackFile", "isBack", false);
-        ini.SaveFile(_CONFIG_FILE);
-        std::filesystem::remove_all("./plugins/BackupHelper/temp1/");
+    if (backup_helper::getConfig().GetBoolValue("BackFile", "isBack", false)) {
+        backup_helper::getConfig().SetBoolValue("BackFile", "isBack", false);
+        backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
+        std::filesystem::remove_all(backup_helper::BackupHelper::getInstance().getSelf().getModDir() / "temp1");
         SendFeedback(uuid, "Recover is Canceled."_tr());
     }
 }
@@ -79,18 +78,18 @@ void CmdListBackup(mce::UUID uuid, int limit) {
 
 // 重启时调用
 void RecoverWorld() {
-    bool isBack = ini.GetBoolValue("BackFile", "isBack", false);
+    bool isBack = backup_helper::getConfig().GetBoolValue("BackFile", "isBack", false);
     if (isBack) {
         SendFeedback(mce::UUID::EMPTY, "Rollbacking..."_tr());
-        std::string worldName = ini.GetValue("BackFile", "worldName", "Bedrock level");
+        std::string worldName = backup_helper::getConfig().GetValue("BackFile", "worldName", "Bedrock level");
         if (!CopyRecoverFile(worldName)) {
-            ini.SetBoolValue("BackFile", "isBack", false);
-            ini.SaveFile(_CONFIG_FILE);
+            backup_helper::getConfig().SetBoolValue("BackFile", "isBack", false);
+            backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
             SendFeedback(mce::UUID::EMPTY, "Failed to rollback"_tr());
             return;
         }
-        ini.SetBoolValue("BackFile", "isBack", false);
-        ini.SaveFile(_CONFIG_FILE);
+        backup_helper::getConfig().SetBoolValue("BackFile", "isBack", false);
+        backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
         SendFeedback(mce::UUID::EMPTY, "Rollback successfully"_tr());
     }
 }
