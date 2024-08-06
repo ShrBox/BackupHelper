@@ -31,7 +31,7 @@
 
 #define TEMP_DIR  backup_helper::BackupHelper::getInstance().getSelf().getModDir() / "temp"
 #define TEMP1_DIR backup_helper::BackupHelper::getInstance().getSelf().getModDir() / "temp1"
-#define ZIP_PATH  "./7za.exe"
+#define ZIP_PATH  "7za.exe"
 using ll::i18n_literals::operator""_tr;
 
 bool                     isWorking = false;
@@ -188,7 +188,7 @@ bool ZipFiles(const std::string& worldName) {
         char tmpParas[_MAX_PATH * 4] = {0};
         sprintf(
             tmpParas,
-            "a \"%s\\%s_%s.7z\" \"%ls%s\" -sdel -mx%d -mmt",
+            "a \"%s\\%s_%s.7z\" \"%ls/%s\" -sdel -mx%d -mmt",
             backupPath.c_str(),
             worldName.c_str(),
             timeStr,
