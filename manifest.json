@@ -4,6 +4,5 @@
     "version": "${modVersion}",
     "type": "native",
     "description": "A LeviLamina plugin which is port from LiteLoaderBDS to help you backup more easily",
-    "author": "yqs112358 & ShrBox",
-    "version": "0.5.2"
+    "author": "yqs112358 & ShrBox"
 }
