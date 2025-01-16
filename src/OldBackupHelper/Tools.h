@@ -1,12 +1,12 @@
 #pragma once
 #include "Entry.h"
-#include "mc/deps/core/mce/UUID.h"
+#include "ll/api/service/Bedrock.h"
+#include "ll/api/utils/ErrorUtils.h"
+#include "mc/platform/UUID.h"
+#include "mc/world/actor/player/Player.h"
+#include "mc/world/level/Level.h"
+
 #include <exception>
-#include <ll/api/Logger.h>
-#include <ll/api/service/Bedrock.h>
-#include <ll/api/utils/ErrorUtils.h>
-#include <mc/world/actor/player/Player.h>
-#include <mc/world/level/Level.h>
 #include <string>
 
 
@@ -24,18 +24,19 @@ inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
         extern mce::UUID playerUuid;
         playerUuid = uuid;
     }
-    if (!found || uuid.isEmpty()) backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
-    else {
+    if (!found || uuid.isEmpty()) {
+        backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
+    } else {
         try {
             // p->sendTextPacket("§e[BackupHelper]§r " + msg, TextType::RAW);
             player->sendMessage("§e[BackupHelper]§r " + msg);
-        } catch (const ll::error_utils::seh_exception&) {
-            extern mce::UUID playerUuid;
-            playerUuid = mce::UUID::EMPTY;
-            backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
         } catch (const std::exception&) {
             extern mce::UUID playerUuid;
-            playerUuid = mce::UUID::EMPTY;
+            playerUuid = mce::UUID::EMPTY();
+            backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
+        } catch (...) {
+            extern mce::UUID playerUuid;
+            playerUuid = mce::UUID::EMPTY();
             backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
         }
     }

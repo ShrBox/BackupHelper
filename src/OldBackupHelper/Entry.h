@@ -4,14 +4,16 @@
 #include <SimpleIni.h>
 
 namespace backup_helper {
+
 std::filesystem::path getConfigPath();
 CSimpleIniA&          getConfig();
+
 class BackupHelper {
 
 public:
     static BackupHelper& getInstance();
 
-    BackupHelper(ll::mod::NativeMod& self) : mSelf(self) {}
+    BackupHelper() : mSelf(*ll::mod::NativeMod::current()) {}
 
     [[nodiscard]] ll::mod::NativeMod& getSelf() const { return mSelf; }
 

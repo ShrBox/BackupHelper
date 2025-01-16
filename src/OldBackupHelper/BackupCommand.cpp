@@ -2,19 +2,19 @@
 #include "Backup.h"
 #include "Tools.h"
 #include "ll/api/chrono/GameChrono.h"
+#include "ll/api/command/Command.h"
+#include "ll/api/command/CommandHandle.h"
+#include "ll/api/command/CommandRegistrar.h"
+#include "ll/api/coro/CoroTask.h"
+#include "ll/api/thread/ServerThreadExecutor.h"
 #include "ll/api/i18n/I18n.h"
-#include "ll/api/schedule/Task.h"
-#include "mc/deps/core/mce/UUID.h"
+#include "mc/platform/UUID.h"
 #include "mc/server/commands/CommandOutput.h"
 #include "mc/server/commands/CommandPermissionLevel.h"
-#include <filesystem>
-#include <ll/api/command/Command.h>
-#include <ll/api/command/CommandHandle.h>
-#include <ll/api/command/CommandRegistrar.h>
-#include <ll/api/schedule/Scheduler.h>
-#include <mc/world/actor/player/Player.h>
+#include "mc/world/actor/player/Player.h"
 
-extern ll::schedule::GameTickScheduler scheduler;
+#include <filesystem>
+
 using ll::i18n_literals::operator""_tr;
 
 void CmdReloadConfig(mce::UUID uuid) {
@@ -33,13 +33,18 @@ void CmdBackup(mce::UUID uuid) {
     if (isWorking) {
         SendFeedback(uuid, "An existing backup is working now..."_tr());
         playerUuid = oldUuid;
-    } else scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), StartBackup);
+    } else {
+        ll::coro::keepThis([]() -> ll::coro::CoroTask<> {
+            co_await ll::chrono::ticks(1);
+            StartBackup();
+        }).launch(ll::thread::ServerThreadExecutor::getDefault());
+    }
 }
 
 void CmdCancel(mce::UUID uuid) {
     if (isWorking) {
         isWorking  = false;
-        playerUuid = mce::UUID::EMPTY;
+        playerUuid = mce::UUID::EMPTY();
         SendFeedback(uuid, "Backup is Canceled."_tr());
     } else {
         SendFeedback(uuid, "No backup is working now."_tr());
@@ -59,7 +64,12 @@ void CmdRecoverBefore(mce::UUID uuid, int recover_Num) {
     if (isWorking) {
         SendFeedback(uuid, "An existing task is working now...Please wait and try again"_tr());
         playerUuid = oldUuid;
-    } else scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), [recover_Num] { StartRecover(recover_Num); });
+    } else {
+        ll::coro::keepThis([recover_Num]() -> ll::coro::CoroTask<> {
+            co_await ll::chrono::ticks(1);
+            StartRecover(recover_Num);
+        }).launch(ll::thread::ServerThreadExecutor::getDefault());
+    }
 }
 // 列出存在的存档备份
 void CmdListBackup(mce::UUID uuid, int limit) {
@@ -80,17 +90,17 @@ void CmdListBackup(mce::UUID uuid, int limit) {
 void RecoverWorld() {
     bool isBack = backup_helper::getConfig().GetBoolValue("BackFile", "isBack", false);
     if (isBack) {
-        SendFeedback(mce::UUID::EMPTY, "Rollbacking..."_tr());
+        SendFeedback(mce::UUID::EMPTY(), "Rollbacking..."_tr());
         std::string worldName = backup_helper::getConfig().GetValue("BackFile", "worldName", "Bedrock level");
         if (!CopyRecoverFile(worldName)) {
             backup_helper::getConfig().SetBoolValue("BackFile", "isBack", false);
             backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
-            SendFeedback(mce::UUID::EMPTY, "Failed to rollback"_tr());
+            SendFeedback(mce::UUID::EMPTY(), "Failed to rollback"_tr());
             return;
         }
         backup_helper::getConfig().SetBoolValue("BackFile", "isBack", false);
         backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
-        SendFeedback(mce::UUID::EMPTY, "Rollback successfully"_tr());
+        SendFeedback(mce::UUID::EMPTY(), "Rollback successfully"_tr());
     }
 }
 
@@ -115,20 +125,20 @@ void RegisterCommand() {
             switch (param.backupOperation) {
             case BackupOperation::reload:
                 CmdReloadConfig(
-                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY
+                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY()
                 );
                 break;
             case BackupOperation::cancel:
-                CmdCancel(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY);
+                CmdCancel(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY());
                 break;
             case BackupOperation::list:
                 CmdListBackup(
-                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY,
+                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY(),
                     100
                 );
                 break;
             default:
-                CmdBackup(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY);
+                CmdBackup(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY());
                 break;
             }
             output.success();
@@ -139,7 +149,7 @@ void RegisterCommand() {
         .execute(
             [&](CommandOrigin const& origin, CommandOutput& output, BackupRecoverCommand const& param, Command const&) {
                 CmdRecoverBefore(
-                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY,
+                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY(),
                     param.recoverNumber
                 );
                 output.success();

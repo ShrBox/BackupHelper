@@ -8,8 +8,10 @@
 #include "ll/api/mod/RegisterHelper.h"
 #include "ll/api/service/Bedrock.h"
 #include "mc/server/commands/CommandOrigin.h"
-#include "mc/server/common/PropertiesSettings.h"
-#include "mc/server/common/commands/StopCommand.h"
+#include "mc/server/PropertiesSettings.h"
+#include "mc/server/commands/StopCommand.h"
+#include "ll/api/utils/ErrorUtils.h"
+
 #include <filesystem>
 #include <magic_enum.hpp>
 #include <memory>
@@ -45,14 +47,19 @@ bool Raw_IniOpen(const magic_enum::string& path, const std::string& defContent) 
     }
 }
 
-static std::unique_ptr<BackupHelper> instance;
-
-BackupHelper& BackupHelper::getInstance() { return *instance; }
+BackupHelper& BackupHelper::getInstance() {
+    static BackupHelper instance;
+    return instance;
+}
 
 bool BackupHelper::load() {
     Raw_IniOpen(getConfigPath().string(), "");
-    ll::i18n::load(getSelf().getLangDir());
-    ll::i18n::getInstance()->mDefaultLocaleName = ini.GetValue("Main", "Language", "en_US");
+    auto& instance = ll::i18n::getInstance();
+    auto result = instance.load(getSelf().getLangDir());
+    if (!result) {
+        ll::error_utils::printCurrentException(getSelf().getLogger());
+        return false;
+    }
     getSelf().getLogger().info("BackupHelper loaded! Author: yqs112358, ported by: ShrBox"_tr());
     return true;
 }
@@ -69,19 +76,19 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     PropertiesHook,
     ll::memory::HookPriority::Normal,
     PropertiesSettings,
-    "??0PropertiesSettings@@QEAA@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
-    void,
+    &PropertiesSettings::$ctor,
+    void*,
     std::string const& filename
 ) {
     RecoverWorld();
-    origin(filename);
+    return origin(filename);
 }
 
 LL_AUTO_TYPE_INSTANCE_HOOK(
     StopCommandHook,
     ll::memory::HookPriority::Normal,
     StopCommand,
-    "?execute@StopCommand@@UEBAXAEBVCommandOrigin@@AEAVCommandOutput@@@Z",
+    &StopCommand::$execute,
     void,
     CommandOrigin const& commandOrigin,
     CommandOutput&       output
@@ -97,4 +104,4 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
 
 } // namespace backup_helper
 
-LL_REGISTER_MOD(backup_helper::BackupHelper, backup_helper::instance);
+LL_REGISTER_MOD(backup_helper::BackupHelper, backup_helper::BackupHelper::getInstance());

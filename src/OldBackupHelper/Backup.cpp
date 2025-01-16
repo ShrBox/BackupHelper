@@ -1,26 +1,26 @@
 #include "Backup.h"
 #include "Entry.h"
-#include "OldBackupHelper/Entry.h"
 #include "Tools.h"
 #include "ll/api/chrono/GameChrono.h"
-#include "ll/api/schedule/Task.h"
+#include "ll/api/coro/CoroTask.h"
+#include "ll/api/thread/ServerThreadExecutor.h"
+#include "ll/api/i18n/I18n.h"
+#include "ll/api/memory/Hook.h"
 #include "ll/api/utils/ErrorUtils.h"
-#include "mc/deps/core/mce/UUID.h"
+#include "mc/deps/core/string/HashedString.h"
+#include "mc/deps/core/utility/MCRESULT.h"
+#include "mc/locale/I18n.h"
+#include "mc/locale/Localization.h"
+#include "mc/server/commands/Command.h"
+#include "mc/server/commands/CommandContext.h"
+#include "mc/server/commands/CommandOutput.h"
+#include "mc/server/commands/CommandVersion.h"
+#include "mc/server/commands/MinecraftCommands.h"
+#include "mc/server/commands/ServerCommandOrigin.h"
+#include "mc/world/Minecraft.h"
+#include "mc/world/level/storage/DBStorage.h"
+
 #include <filesystem>
-#include <ll/api/i18n/I18n.h>
-#include <ll/api/memory/Hook.h>
-#include <ll/api/schedule/Scheduler.h>
-#include <mc/deps/core/string/HashedString.h>
-#include <mc/locale/I18n.h>
-#include <mc/locale/Localization.h>
-#include <mc/server/commands/CommandContext.h>
-#include <mc/server/commands/CommandOutput.h>
-#include <mc/server/commands/MinecraftCommands.h>
-#include <mc/server/commands/ServerCommandOrigin.h>
-#include <mc/world/Minecraft.h>
-#include <mc/world/actor/player/Player.h>
-#include <mc/world/level/Command.h>
-#include <mc/world/level/storage/DBStorage.h>
 #include <regex>
 #include <shellapi.h>
 #include <string>
@@ -43,20 +43,18 @@ struct SnapshotFilenameAndLength {
     size_t      size;
 };
 
-ll::schedule::GameTickScheduler scheduler;
-
 void ResumeBackup();
 
 void SuccessEnd() {
     SendFeedback(playerUuid, "Backup ended successfully"_tr());
-    playerUuid = mce::UUID::EMPTY;
+    playerUuid = mce::UUID::EMPTY();
     // The isWorking assignment here has been moved to line 321
 }
 
 void FailEnd(int code = -1) {
     SendFeedback(playerUuid, "Failed to backup!"_tr() + (code == -1 ? "" : " Error code: {0}"_tr(code)));
     ResumeBackup();
-    playerUuid = mce::UUID::EMPTY;
+    playerUuid = mce::UUID::EMPTY();
     isWorking  = false;
 }
 
@@ -138,7 +136,7 @@ bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLeng
 
     std::filesystem::copy("./worlds/" + worldName, TEMP_DIR / worldName, std::filesystem::copy_options::recursive, ec);
     if (ec.value() != 0) {
-        SendFeedback(playerUuid, "Failed to copy save files! {0}"_tr(ec.message()));
+        SendFeedback(playerUuid, "Failed to copy save files!"_tr() + " " + ec.message());
         FailEnd(GetLastError());
         return false;
     }
@@ -229,13 +227,14 @@ bool ZipFiles(const std::string& worldName) {
             FailEnd(GetLastError());
         }
         CloseHandle(sh.hProcess);
-    } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(playerUuid, "Exception in zip process! Error Code: {0}"_tr(e.code().value()) + ' ' + e.what());
+    } catch (const std::exception& e) {
+        SendFeedback(playerUuid, "Exception in zip process! "_tr() + " " + e.what());
         FailEnd(GetLastError());
         return false;
-    } catch (const std::exception& e) {
-        SendFeedback(playerUuid, "Exception in zip process! {0}"_tr(e.what()));
-        FailEnd(GetLastError());
+    } catch (...) {
+        SendFeedback(playerUuid, "Exception in unzip process!");
+        ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
+        // FailEnd(GetLastError());
         return false;
     }
     return true;
@@ -285,15 +284,17 @@ bool UnzipFiles(const std::string& fileName) {
             // FailEnd(GetLastError());
         }
         CloseHandle(sh.hProcess);
-    } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(playerUuid, "Exception in unzip process! Error Code: {0}"_tr(e.code().value()));
+    } catch (const std::exception& e) {
+        SendFeedback(playerUuid, "Exception in unzip process! "_tr() + " " + e.what());
         // FailEnd(GetLastError());
         return false;
-    } catch (const std::exception& e) {
-        SendFeedback(playerUuid, "Exception in unzip process! {0}"_tr(e.what()));
+    } catch (...) {
+        SendFeedback(playerUuid, "Exception in unzip process!");
+        ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
         // FailEnd(GetLastError());
         return false;
     }
+
     backup_helper::getConfig().SetBoolValue("BackFile", "isBack", true);
     backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
     return true;
@@ -357,13 +358,15 @@ bool StartBackup() {
         "save hold",
         std::make_unique<ServerCommandOrigin>(
             ServerCommandOrigin("Server", ll::service::getLevel()->asServer(), CommandPermissionLevel::Internal, 0)
-        )
+        ),
+        CommandVersion::CurrentVersion()
     );
     try {
         ll::service::getMinecraft()->getCommands().executeCommand(context, false);
-    } catch (const ll::error_utils::seh_exception& e) {
+    } catch (...) {
         SendFeedback(playerUuid, "Failed to start backup snapshot!");
-        FailEnd(e.code().value());
+        ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
+        FailEnd();
         return false;
     }
     return true;
@@ -401,7 +404,8 @@ bool StartRecover(int recover_NUM) {
         "save hold",
         std::make_unique<ServerCommandOrigin>(
             ServerCommandOrigin("Server", ll::service::getLevel()->asServer(), CommandPermissionLevel::Internal, 0)
-        )
+        ),
+        CommandVersion::CurrentVersion()
     );
     ll::service::getMinecraft()->getCommands().executeCommand(context, false);
     SendFeedback(
@@ -422,7 +426,7 @@ void ResumeBackup() {
         auto command = ll::service::getMinecraft()->getCommands().compileCommand(
             HashedString("save resume"),
             origin,
-            (CurrentCmdVersion)CommandVersion::CurrentVersion,
+            (CurrentCmdVersion)CommandVersion::CurrentVersion(),
             [](std::string const& err) {}
         );
         CommandOutput output(CommandOutputType::AllOutput);
@@ -440,13 +444,21 @@ void ResumeBackup() {
         }
         if (!output.getSuccessCount()) {
             SendFeedback(playerUuid, "Failed to resume backup snapshot!"_tr());
-            scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(RETRY_TICKS), ResumeBackup);
+            ll::coro::keepThis([]() -> ll::coro::CoroTask<> {
+                co_await ll::chrono::ticks(RETRY_TICKS);
+                ResumeBackup();
+            }).launch(ll::thread::ServerThreadExecutor::getDefault());
         } else {
             SendFeedback(playerUuid, outputStr);
         }
-    } catch (const ll::error_utils::seh_exception& e) {
-        SendFeedback(playerUuid, "Failed to resume backup snapshot! Error Code: {0}"_tr(e.code().value()));
-        if (isWorking) scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(RETRY_TICKS), ResumeBackup);
+    } catch (...) {
+        SendFeedback(playerUuid, "Failed to resume backup snapshot!");
+        if (isWorking) {
+            ll::coro::keepThis([]() -> ll::coro::CoroTask<> {
+                co_await ll::chrono::ticks(RETRY_TICKS);
+                ResumeBackup();
+            }).launch(ll::thread::ServerThreadExecutor::getDefault());
+        }
     }
 }
 
@@ -456,40 +468,35 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     CreateSnapShotHook,
     ll::memory::HookPriority::Normal,
     DBStorage,
-    "?createSnapshot@DBStorage@@UEAA?AV?$vector@USnapshotFilenameAndLength@@V?$allocator@USnapshotFilenameAndLength@@@"
-    "std@@@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@3@_N@Z",
+    &DBStorage::$createSnapshot,
     std::vector<struct SnapshotFilenameAndLength>,
     std::string const& worldName,
-    bool               idk
+    bool               flushWriteCache
 ) {
     if (isWorking) {
         backup_helper::getConfig().SetValue("BackFile", "worldName", worldName.c_str());
         backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
-        auto files = origin(worldName, idk);
+        auto files = origin(worldName, flushWriteCache);
         if (CopyFiles(worldName, files)) {
             std::thread([worldName]() {
-                ll::error_utils::setSehTranslator();
                 ZipFiles(worldName);
                 CleanTempDir();
                 SuccessEnd();
             }).detach();
         }
 
-        scheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(20), ResumeBackup);
+        ll::coro::keepThis([]() -> ll::coro::CoroTask<> {
+            co_await ll::chrono::ticks(20);
+            ResumeBackup();
+        }).launch(ll::thread::ServerThreadExecutor::getDefault());
         return files;
     } else {
         isWorking = true; // Prevent the backup command from being accidentally executed during a map hang
-        return origin(worldName, idk);
+        return origin(worldName, flushWriteCache);
     }
 }
 
-LL_AUTO_TYPE_INSTANCE_HOOK(
-    ReleaseSnapShotHook,
-    HookPriority::Normal,
-    DBStorage,
-    "?releaseSnapshot@DBStorage@@UEAAXXZ",
-    void
-) {
+LL_AUTO_TYPE_INSTANCE_HOOK(ReleaseSnapShotHook, HookPriority::Normal, DBStorage, &DBStorage::$releaseSnapshot, void) {
     isWorking = false;
     origin();
 }
