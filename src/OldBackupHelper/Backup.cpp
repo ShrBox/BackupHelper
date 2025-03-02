@@ -417,7 +417,8 @@ bool StartRecover(int recover_NUM) {
     return true;
 }
 
-#define RETRY_TICKS 60
+constexpr unsigned short RETRY_TICKS = 60;
+constexpr unsigned short MAX_RETRY   = 2;
 
 void ResumeBackup() {
     try {
@@ -444,9 +445,15 @@ void ResumeBackup() {
         }
         if (!output.getSuccessCount()) {
             SendFeedback(playerUuid, "Failed to resume backup snapshot!"_tr());
+            SendFeedback(playerUuid, outputStr);
+            static unsigned short retry = 0;
             ll::coro::keepThis([]() -> ll::coro::CoroTask<> {
                 co_await ll::chrono::ticks(RETRY_TICKS);
-                ResumeBackup();
+                if (retry++ < MAX_RETRY) {
+                    ResumeBackup();
+                } else {
+                    retry = 0;
+                }
             }).launch(ll::thread::ServerThreadExecutor::getDefault());
         } else {
             SendFeedback(playerUuid, outputStr);
