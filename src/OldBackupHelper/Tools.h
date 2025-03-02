@@ -15,7 +15,7 @@ inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
     bool    found = false;
     auto    level = ll::service::getLevel();
     Player* player;
-    if (level.has_value() && !uuid.isEmpty()) {
+    if (level.has_value() && uuid != mce::UUID::EMPTY()) {
         if ((player = level->getPlayer(uuid))) {
             found = true;
         }
@@ -24,7 +24,7 @@ inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
         extern mce::UUID playerUuid;
         playerUuid = uuid;
     }
-    if (!found || uuid.isEmpty()) {
+    if (!found || uuid != mce::UUID::EMPTY()) {
         backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
     } else {
         try {

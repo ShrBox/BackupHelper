@@ -3,9 +3,9 @@
 #include "Tools.h"
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/coro/CoroTask.h"
-#include "ll/api/thread/ServerThreadExecutor.h"
 #include "ll/api/i18n/I18n.h"
 #include "ll/api/memory/Hook.h"
+#include "ll/api/thread/ServerThreadExecutor.h"
 #include "ll/api/utils/ErrorUtils.h"
 #include "mc/deps/core/string/HashedString.h"
 #include "mc/deps/core/utility/MCRESULT.h"
@@ -362,7 +362,7 @@ bool StartBackup() {
         CommandVersion::CurrentVersion()
     );
     try {
-        ll::service::getMinecraft()->getCommands().executeCommand(context, false);
+        ll::service::getMinecraft()->mCommands->executeCommand(context, false);
     } catch (...) {
         SendFeedback(playerUuid, "Failed to start backup snapshot!");
         ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
@@ -407,7 +407,7 @@ bool StartRecover(int recover_NUM) {
         ),
         CommandVersion::CurrentVersion()
     );
-    ll::service::getMinecraft()->getCommands().executeCommand(context, false);
+    ll::service::getMinecraft()->mCommands->executeCommand(context, false);
     SendFeedback(
         playerUuid,
         "The rollback preparation has been completed. You can rollback by restarting. You can cancel the rollback by using the /backup cancel command."_tr(
@@ -424,7 +424,7 @@ void ResumeBackup() {
     try {
         auto origin =
             ServerCommandOrigin("Server", ll::service::getLevel()->asServer(), CommandPermissionLevel::Internal, 0);
-        auto command = ll::service::getMinecraft()->getCommands().compileCommand(
+        auto command = ll::service::getMinecraft()->mCommands->compileCommand(
             HashedString("save resume"),
             origin,
             (CurrentCmdVersion)CommandVersion::CurrentVersion(),
@@ -434,16 +434,16 @@ void ResumeBackup() {
         std::string   outputStr;
         if (command) {
             command->run(origin, output);
-            for (auto msg : output.getMessages()) {
+            for (auto msg : output.mMessages) {
                 std::string temp;
-                getI18n().getCurrentLanguage()->get(msg.getMessageId(), temp, msg.getParams());
+                getI18n().getCurrentLanguage()->get(msg.mMessageId, temp, msg.mParams);
                 outputStr += temp.append("\n");
             }
-            if (output.getMessages().size()) {
+            if (output.mMessages.size()) {
                 outputStr.pop_back();
             }
         }
-        if (!output.getSuccessCount()) {
+        if (!output.mSuccessCount) {
             SendFeedback(playerUuid, "Failed to resume backup snapshot!"_tr());
             SendFeedback(playerUuid, outputStr);
             static unsigned short retry = 0;
