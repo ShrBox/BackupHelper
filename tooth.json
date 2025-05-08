@@ -16,7 +16,8 @@
         {
             "platform": "win-x64",
             "dependencies": {
-                "gitea.litebds.com/ShrBox/7-zip": "24.*"
+                "gitea.litebds.com/ShrBox/7-zip": "24.*",
+                "github.com/LiteLDev/LeviLamina": "1.2.0-rc.1"
             },
             "assets": [
                 {
