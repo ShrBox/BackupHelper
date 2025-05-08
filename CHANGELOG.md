@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2025-05-08
+
+### Changed
+
+- Adapted to LeviLamina 1.2.0-rc.1(MCBE 1.21.70.04)
+
 ## [0.7.1] - 2025-04-12
 
 ### Changed
@@ -100,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release
 
+[0.8.0]: https://github.com/ShrBox/BackupHelper/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/ShrBox/BackupHelper/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/ShrBox/BackupHelper/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/ShrBox/BackupHelper/compare/v0.6.1...v0.6.2
