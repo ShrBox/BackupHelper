@@ -8,7 +8,6 @@ else
     add_requires("levilamina 1.2.0-rc.1", {configs = {target_type = "client"}})
 end
 
-add_requireconfs("levilamina.levibuildscript", {configs = {version = "0.4.1"}})
 add_requires("levibuildscript", "simpleini")
 
 if not has_config("vs_runtime") then
