@@ -1,5 +1,6 @@
 #include "Backup.h"
 #include "Entry.h"
+#include "Interval.h"
 #include "Tools.h"
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/coro/CoroTask.h"
@@ -48,6 +49,7 @@ void ResumeBackup();
 void SuccessEnd() {
     SendFeedback(playerUuid, "Backup ended successfully"_tr());
     playerUuid = mce::UUID::EMPTY();
+    IntervalOnBackupFinished();
     // The isWorking assignment here has been moved to line 321
 }
 

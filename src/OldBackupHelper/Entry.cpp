@@ -2,15 +2,17 @@
 
 #include "Backup.h"
 #include "BackupCommand.h"
+#include "Interval.h"
 #include "ll/api/Expected.h"
 #include "ll/api/i18n/I18n.h"
 #include "ll/api/memory/Hook.h"
 #include "ll/api/mod/RegisterHelper.h"
 #include "ll/api/service/Bedrock.h"
-#include "mc/server/commands/CommandOrigin.h"
-#include "mc/server/PropertiesSettings.h"
-#include "mc/server/commands/StopCommand.h"
 #include "ll/api/utils/ErrorUtils.h"
+#include "mc/server/PropertiesSettings.h"
+#include "mc/server/commands/CommandOrigin.h"
+#include "mc/server/commands/StopCommand.h"
+
 
 #include <filesystem>
 #include <magic_enum.hpp>
@@ -55,7 +57,7 @@ BackupHelper& BackupHelper::getInstance() {
 bool BackupHelper::load() {
     Raw_IniOpen(getConfigPath().string(), "");
     auto& instance = ll::i18n::getInstance();
-    auto result = instance.load(getSelf().getLangDir());
+    auto  result   = instance.load(getSelf().getLangDir());
     if (!result) {
         ll::error_utils::printCurrentException(getSelf().getLogger());
         return false;
@@ -66,10 +68,14 @@ bool BackupHelper::load() {
 
 bool BackupHelper::enable() {
     RegisterCommand();
+    StartInterval();
     return true;
 }
 
-bool BackupHelper::disable() { return true; }
+bool BackupHelper::disable() {
+    StopInterval();
+    return true;
+}
 
 // 存档开始加载前替换存档文件
 LL_AUTO_TYPE_INSTANCE_HOOK(
