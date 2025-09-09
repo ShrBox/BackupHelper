@@ -12,11 +12,6 @@ std::chrono::seconds GetNow() {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch());
 }
 
-void IntervalOnBackupFinished() {
-    backup_helper::getConfig().SetLongValue("BackFile", "lastTime", GetNow().count());
-    backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
-}
-
 void StartInterval() {
     long intervalHours = backup_helper::getConfig().GetLongValue("Main", "BackupInterval", 0);
     if (intervalHours == 0) {
@@ -39,6 +34,8 @@ void StartInterval() {
 
             if (!GetIsWorking()) {
                 StartBackup();
+                backup_helper::getConfig().SetLongValue("BackFile", "lastTime", GetNow().count());
+                backup_helper::getConfig().SaveFile(backup_helper::getConfigPath().c_str());
             }
 
             co_await ll::chrono::game::ticks(20);
