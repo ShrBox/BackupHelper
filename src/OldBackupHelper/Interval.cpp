@@ -4,9 +4,10 @@
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/coro/CoroTask.h"
 #include "ll/api/thread/ServerThreadExecutor.h"
+#include <atomic>
 #include <chrono>
 
-bool isRunning = false;
+std::atomic_bool isRunning = false;
 
 std::chrono::seconds GetNow() {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch());
