@@ -6,8 +6,8 @@
 #include "ll/api/command/CommandHandle.h"
 #include "ll/api/command/CommandRegistrar.h"
 #include "ll/api/coro/CoroTask.h"
-#include "ll/api/thread/ServerThreadExecutor.h"
 #include "ll/api/i18n/I18n.h"
+#include "ll/api/thread/ServerThreadExecutor.h"
 #include "mc/platform/UUID.h"
 #include "mc/server/commands/CommandOutput.h"
 #include "mc/server/commands/CommandPermissionLevel.h"
@@ -78,7 +78,7 @@ void CmdListBackup(mce::UUID uuid, int limit) {
         SendFeedback(uuid, "No Backup Files"_tr());
         return;
     }
-    int totalSize = backupList.size();
+    int totalSize = (int)backupList.size();
     int maxNum    = totalSize < limit ? totalSize : limit;
     SendFeedback(uuid, "Select the rollback file using the number before the archive file"_tr());
     for (int i = 0; i < maxNum; i++) {
@@ -113,36 +113,45 @@ struct BackupRecoverCommand {
 };
 
 void RegisterCommand() {
+    CommandPermissionLevel requirement = (CommandPermissionLevel)backup_helper::getConfig().GetLongValue(
+        "Main",
+        "CommandPermissionLevel",
+        (long)CommandPermissionLevel::GameDirectors
+    );
+
     using ll::command::CommandRegistrar;
-    auto& command = ll::command::CommandRegistrar::getInstance()
-                        .getOrCreateCommand("backup", "Create a backup"_tr(), CommandPermissionLevel::GameDirectors);
+    auto& command =
+        ll::command::CommandRegistrar::getInstance().getOrCreateCommand("backup", "Create a backup"_tr(), requirement);
     command.overload<BackupMainCommand>()
         .optional("backupOperation")
-        .execute([&](CommandOrigin const&     origin,
-                     CommandOutput&           output,
-                     BackupMainCommand const& param,
-                     Command const&) {
-            switch (param.backupOperation) {
-            case BackupOperation::reload:
-                CmdReloadConfig(
-                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY()
-                );
-                break;
-            case BackupOperation::cancel:
-                CmdCancel(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY());
-                break;
-            case BackupOperation::list:
-                CmdListBackup(
-                    origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY(),
-                    100
-                );
-                break;
-            default:
-                CmdBackup(origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY());
-                break;
+        .execute(
+            [&](CommandOrigin const& origin, CommandOutput& output, BackupMainCommand const& param, Command const&) {
+                switch (param.backupOperation) {
+                case BackupOperation::reload:
+                    CmdReloadConfig(
+                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY()
+                    );
+                    break;
+                case BackupOperation::cancel:
+                    CmdCancel(
+                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY()
+                    );
+                    break;
+                case BackupOperation::list:
+                    CmdListBackup(
+                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY(),
+                        100
+                    );
+                    break;
+                default:
+                    CmdBackup(
+                        origin.getEntity() ? static_cast<Player*>(origin.getEntity())->getUuid() : mce::UUID::EMPTY()
+                    );
+                    break;
+                }
+                ++output.mSuccessCount;
             }
-            ++output.mSuccessCount;
-        });
+        );
     command.overload<BackupRecoverCommand>()
         .text("recover")
         .required("recoverNumber")

@@ -25,10 +25,10 @@ CSimpleIniA ini;
 std::filesystem::path getConfigPath() { return BackupHelper::getInstance().getSelf().getModDir() / "config.ini"; }
 CSimpleIniA&          getConfig() { return ini; }
 
-bool Raw_IniOpen(const magic_enum::string& path, const std::string& defContent) {
+bool Raw_IniOpen(std::filesystem::path const& path, const std::string& defContent) {
     if (!std::filesystem::exists(path)) {
         // 创建新的
-        std::filesystem::create_directories(std::filesystem::path(path).remove_filename().u8string());
+        std::filesystem::create_directories(std::filesystem::path{path}.remove_filename().u8string());
 
         std::ofstream iniFile(path);
         if (iniFile.is_open() && defContent != "") iniFile << defContent;
@@ -53,7 +53,7 @@ BackupHelper& BackupHelper::getInstance() {
 }
 
 bool BackupHelper::load() {
-    Raw_IniOpen(getConfigPath().string(), "");
+    Raw_IniOpen(getConfigPath(), "");
     auto& instance = ll::i18n::getInstance();
     auto result = instance.load(getSelf().getLangDir());
     if (!result) {
