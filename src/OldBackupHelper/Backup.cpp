@@ -11,6 +11,7 @@
 #include "mc/deps/core/utility/MCRESULT.h"
 #include "mc/locale/I18n.h"
 #include "mc/locale/Localization.h"
+#include "mc/locale/OptionalString.h"
 #include "mc/server/commands/Command.h"
 #include "mc/server/commands/CommandContext.h"
 #include "mc/server/commands/CommandOutput.h"
@@ -410,8 +411,7 @@ bool StartRecover(int recover_NUM) {
     ll::service::getMinecraft()->mCommands->executeCommand(context, false);
     SendFeedback(
         playerUuid,
-        "The rollback preparation has been completed. You can rollback by restarting. You can cancel the rollback by using the /backup cancel command."_tr(
-        )
+        "The rollback preparation has been completed. You can rollback by restarting. You can cancel the rollback by using the /backup cancel command."_tr()
     ); // 回档准备已完成，重启可回档，使用 /backup cancel指令可取消回档
     backupList.clear();
     return true;
@@ -435,11 +435,12 @@ void ResumeBackup() {
         if (command) {
             command->run(origin, output);
             for (auto msg : output.mMessages) {
-                std::string temp;
-                getI18n().getCurrentLanguage()->get(msg.mMessageId, temp, msg.mParams);
-                outputStr += temp.append("\n");
+                auto opStr = getI18n().getCurrentLanguage()->_get(msg.mMessageId, msg.mParams);
+                if (opStr.valid) {
+                    outputStr += opStr.string.get() + "\n";
+                }
             }
-            if (output.mMessages.size()) {
+            if (!output.mMessages.empty()) {
                 outputStr.pop_back();
             }
         }
