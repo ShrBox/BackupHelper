@@ -11,6 +11,7 @@
 #include "mc/deps/core/utility/MCRESULT.h"
 #include "mc/locale/I18n.h"
 #include "mc/locale/Localization.h"
+#include "mc/locale/OptionalString.h"
 #include "mc/server/commands/Command.h"
 #include "mc/server/commands/CommandContext.h"
 #include "mc/server/commands/CommandOutput.h"
@@ -183,20 +184,17 @@ bool ZipFiles(const std::string& worldName) {
         int         level      = backup_helper::getConfig().GetLongValue("Main", "Compress", 0);
 
         // Prepare command line
-        char tmpParas[_MAX_PATH * 4] = {0};
-        sprintf(
-            tmpParas,
-            "a \"%s\\%s_%s.7z\" \"%ls/%s\" -sdel -mx%d -mmt",
-            backupPath.c_str(),
-            worldName.c_str(),
-            timeStr,
-            (TEMP_DIR).c_str(),
-            worldName.c_str(),
-            level
+        auto paras = ll::string_utils::str2wstr(
+            fmt::format(
+                "a \"{}\\{}_{}.7z\" \"{}/{}\" -sdel -mx{} -mmt",
+                backupPath,
+                worldName,
+                timeStr,
+                ll::string_utils::u8str2str((TEMP_DIR).u8string()),
+                worldName,
+                level
+            )
         );
-
-        wchar_t paras[_MAX_PATH * 4] = {0};
-        ll::string_utils::str2wstr(tmpParas).copy(paras, strlen(tmpParas), 0);
 
         DWORD maxWait = backup_helper::getConfig().GetLongValue("Main", "MaxWaitForZip", 0);
         if (maxWait <= 0) maxWait = 0xFFFFFFFF;
@@ -210,7 +208,7 @@ bool ZipFiles(const std::string& worldName) {
         sh.lpVerb                = L"open";
         sh.nShow                 = SW_HIDE;
         sh.lpFile                = zipPath.c_str();
-        sh.lpParameters          = paras;
+        sh.lpParameters          = paras.c_str();
         if (!ShellExecuteEx(&sh)) {
             SendFeedback(playerUuid, "Fail to create Zip process!"_tr());
             FailEnd(GetLastError());
@@ -245,14 +243,10 @@ bool UnzipFiles(const std::string& fileName) {
         // Get Name
 
         std::string backupPath = backup_helper::getConfig().GetValue("Main", "BackupPath", "backup");
-        int         level      = backup_helper::getConfig().GetLongValue("Main", "Compress", 0);
 
-        // Prepare command line
-        char tmpParas[_MAX_PATH * 4] = {0};
-        sprintf(tmpParas, "x \"%s\\%s\" -o%ls", backupPath.c_str(), fileName.c_str(), (TEMP1_DIR).c_str());
-
-        wchar_t paras[_MAX_PATH * 4] = {0};
-        ll::string_utils::str2wstr(tmpParas).copy(paras, strlen(tmpParas), 0);
+        auto paras = ll::string_utils::str2wstr(
+            fmt::format("x \"{}\\{}\" -o{}", backupPath, fileName, ll::string_utils::u8str2str((TEMP_DIR).u8string()))
+        );
         std::filesystem::remove_all(TEMP1_DIR);
 
         DWORD maxWait = backup_helper::getConfig().GetLongValue("Main", "MaxWaitForZip", 0);
@@ -267,7 +261,7 @@ bool UnzipFiles(const std::string& fileName) {
         sh.lpVerb                = L"open";
         sh.nShow                 = SW_HIDE;
         sh.lpFile                = zipPath.c_str();
-        sh.lpParameters          = paras;
+        sh.lpParameters          = paras.c_str();
         if (!ShellExecuteEx(&sh)) {
             SendFeedback(playerUuid, "Fail to Unzip process!"_tr());
             // FailEnd(GetLastError());
@@ -304,17 +298,17 @@ std::vector<std::string> getAllBackup() {
     std::string                      backupPath = backup_helper::getConfig().GetValue("Main", "BackupPath", "backup");
     std::filesystem::directory_entry entry(backupPath);
     std::regex                       isBackFile(".*7z");
-    std::vector<std::string>         backupList;
+    std::vector<std::string>         result;
     if (entry.status().type() == std::filesystem::file_type::directory) {
         for (const auto& iter : std::filesystem::directory_iterator(backupPath)) {
             std::string str = iter.path().filename().string();
             if (std::regex_match(str, isBackFile)) {
-                backupList.push_back(str);
+                result.push_back(str);
             }
         }
     }
-    std::reverse(backupList.begin(), backupList.end());
-    return backupList;
+    std::reverse(result.begin(), result.end());
+    return result;
 }
 
 bool CopyRecoverFile(const std::string& worldName) {
@@ -410,8 +404,7 @@ bool StartRecover(int recover_NUM) {
     ll::service::getMinecraft()->mCommands->executeCommand(context, false);
     SendFeedback(
         playerUuid,
-        "The rollback preparation has been completed. You can rollback by restarting. You can cancel the rollback by using the /backup cancel command."_tr(
-        )
+        "The rollback preparation has been completed. You can rollback by restarting. You can cancel the rollback by using the /backup cancel command."_tr()
     ); // 回档准备已完成，重启可回档，使用 /backup cancel指令可取消回档
     backupList.clear();
     return true;
@@ -428,18 +421,19 @@ void ResumeBackup() {
             HashedString("save resume"),
             origin,
             (CurrentCmdVersion)CommandVersion::CurrentVersion(),
-            [](std::string const& err) {}
+            [](std::string const&) {}
         );
         CommandOutput output(CommandOutputType::AllOutput);
         std::string   outputStr;
         if (command) {
             command->run(origin, output);
             for (auto msg : output.mMessages) {
-                std::string temp;
-                getI18n().getCurrentLanguage()->get(msg.mMessageId, temp, msg.mParams);
-                outputStr += temp.append("\n");
+                auto opStr = getI18n().getCurrentLanguage()->_get(msg.mMessageId, msg.mParams);
+                if (opStr.valid) {
+                    outputStr += opStr.string.get() + "\n";
+                }
             }
-            if (output.mMessages.size()) {
+            if (!output.mMessages.empty()) {
                 outputStr.pop_back();
             }
         }

@@ -12,32 +12,22 @@
 
 template <typename... Args>
 inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
-    bool    found = false;
-    auto    level = ll::service::getLevel();
-    Player* player;
+    auto    level  = ll::service::getLevel();
+    Player* player = nullptr;
     if (level.has_value() && uuid != mce::UUID::EMPTY()) {
-        if ((player = level->getPlayer(uuid))) {
-            found = true;
-        }
+        player = level->getPlayer(uuid);
     }
-    if (!found) {
+    if (!player) {
         extern mce::UUID playerUuid;
         playerUuid = uuid;
     }
-    if (!found || uuid != mce::UUID::EMPTY()) {
+    if (!player) {
         backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
-    } else {
-        try {
-            // p->sendTextPacket("§e[BackupHelper]§r " + msg, TextType::RAW);
+    } else try {
             player->sendMessage("§e[BackupHelper]§r " + msg);
-        } catch (const std::exception&) {
-            extern mce::UUID playerUuid;
-            playerUuid = mce::UUID::EMPTY();
-            backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
         } catch (...) {
             extern mce::UUID playerUuid;
             playerUuid = mce::UUID::EMPTY();
             backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
         }
-    }
 }
