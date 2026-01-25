@@ -15,7 +15,6 @@
 
 
 #include <filesystem>
-#include <magic_enum.hpp>
 #include <memory>
 
 using ll::i18n_literals::operator""_tr;

@@ -78,7 +78,7 @@ void CmdListBackup(mce::UUID uuid, int limit) {
         SendFeedback(uuid, "No Backup Files"_tr());
         return;
     }
-    int totalSize = (int)backupList.size();
+    int totalSize = static_cast<int>(backupList.size());
     int maxNum    = totalSize < limit ? totalSize : limit;
     SendFeedback(uuid, "Select the rollback file using the number before the archive file"_tr());
     for (int i = 0; i < maxNum; i++) {
@@ -88,8 +88,7 @@ void CmdListBackup(mce::UUID uuid, int limit) {
 
 // 重启时调用
 void RecoverWorld() {
-    bool isBack = backup_helper::getConfig().GetBoolValue("BackFile", "isBack", false);
-    if (isBack) {
+    if (backup_helper::getConfig().GetBoolValue("BackFile", "isBack", false)) {
         SendFeedback(mce::UUID::EMPTY(), "Rollbacking..."_tr());
         std::string worldName = backup_helper::getConfig().GetValue("BackFile", "worldName", "Bedrock level");
         if (!CopyRecoverFile(worldName)) {
@@ -113,15 +112,15 @@ struct BackupRecoverCommand {
 };
 
 void RegisterCommand() {
-    CommandPermissionLevel requirement = (CommandPermissionLevel)backup_helper::getConfig().GetLongValue(
+    auto requirement = static_cast<CommandPermissionLevel>(backup_helper::getConfig().GetLongValue(
         "Main",
         "CommandPermissionLevel",
-        (long)CommandPermissionLevel::GameDirectors
-    );
+        static_cast<long>(CommandPermissionLevel::GameDirectors)
+    ));
 
     using ll::command::CommandRegistrar;
-    auto& command =
-        ll::command::CommandRegistrar::getInstance().getOrCreateCommand("backup", "Create a backup"_tr(), requirement);
+    auto& command = ll::command::CommandRegistrar::getInstance(false)
+                        .getOrCreateCommand("backup", "Create a backup"_tr(), requirement);
     command.overload<BackupMainCommand>()
         .optional("backupOperation")
         .execute(
