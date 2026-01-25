@@ -11,7 +11,7 @@ template <typename... Args>
 inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
     auto    level  = ll::service::getLevel();
     Player* player = nullptr;
-    if (level.has_value() && (uuid.a != mce::UUID::EMPTY().a || uuid.b != mce::UUID::EMPTY().b)) {
+    if (level.has_value() && (uuid != mce::UUID::EMPTY())) {
         player = level->getPlayer(uuid);
     }
     if (!player) {
