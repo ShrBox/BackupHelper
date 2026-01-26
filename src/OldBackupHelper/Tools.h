@@ -18,11 +18,11 @@ inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
         playerUuid = uuid;
     }
     if (!player) {
-        backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
+        backup_helper::getLogger().info(msg);
     } else try {
             player->sendMessage("§e[BackupHelper]§r " + msg);
         } catch (...) {
             playerUuid = mce::UUID::EMPTY();
-            backup_helper::BackupHelper::getInstance().getSelf().getLogger().info(msg);
+            backup_helper::getLogger().info(msg);
         }
 }

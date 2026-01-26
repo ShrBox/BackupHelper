@@ -23,25 +23,42 @@ namespace backup_helper {
 
 CSimpleIniA ini;
 
+std::string_view defaultIni = R"([Main]
+; 备份存档保存的最长时间，单位：天 | Maximum backup storage time in days
+MaxStorageTime=7
+; 备份文件夹位置（相对于服务器根目录） | Backup folder location (relative to server root)
+BackupPath=.\backup
+; 备份文件压缩等级，可选等级有0,1,3,5,7,9 | Backup compression level (0=store only, 1=fastest, 9=best)
+; 默认为0，即仅打包 | Default is 0 (no compression, just archive)
+Compress=0
+; 等待压缩的最长时间，单位：秒，如果为0则无限等待 | Maximum wait time for compression in seconds (0=unlimited)
+MaxWaitForZip=1800
+; 定期自动备份间隔时间（单位：小时），设为0则禁用自动备份 | Automatic backup interval in hours (0=disabled)
+; 注意：服务器重启不会影响定时器 | Note: Server restart does not affect the timer
+BackupInterval=24
+CommandPermissionLevel=1
+ArchiveFormat=7z
+)";
+
 std::filesystem::path getConfigPath() { return BackupHelper::getInstance().getSelf().getModDir() / "config.ini"; }
 CSimpleIniA&          getConfig() { return ini; }
+ll::io::Logger&       getLogger() { return BackupHelper::getInstance().getSelf().getLogger(); }
 
-bool Raw_IniOpen(std::filesystem::path const& path, const std::string& defContent) {
+bool Raw_IniOpen(std::filesystem::path const& path, const std::string_view defContent) {
     if (!std::filesystem::exists(path)) {
         // 创建新的
         std::filesystem::create_directories(std::filesystem::path{path}.remove_filename().u8string());
 
         std::ofstream iniFile(path);
-        if (iniFile.is_open() && defContent != "") iniFile << defContent;
+        if (iniFile.is_open() && !defContent.empty()) iniFile << defContent;
         iniFile.close();
     }
 
     // 已存在
-    backup_helper::getConfig().SetUnicode(true);
-    auto res = backup_helper::getConfig().LoadFile(path.c_str());
+    getConfig().SetUnicode(true);
+    auto res = getConfig().LoadFile(path.c_str());
     if (res < 0) {
-        backup_helper::BackupHelper::getInstance().getSelf().getLogger().error("Failed to open configuration file!"_tr()
-        );
+        getLogger().error("Failed to open configuration file!"_tr());
         return false;
     } else {
         return true;
@@ -54,7 +71,7 @@ BackupHelper& BackupHelper::getInstance() {
 }
 
 bool BackupHelper::load() {
-    Raw_IniOpen(getConfigPath(), "");
+    Raw_IniOpen(getConfigPath(), defaultIni);
     auto& instance = ll::i18n::getInstance();
     auto  result   = instance.load(getSelf().getLangDir());
     if (!result) {
@@ -99,7 +116,7 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     CommandOutput&       output
 ) {
     if (GetIsWorking()) {
-        backup_helper::BackupHelper::getInstance().getSelf().getLogger().error(
+        getLogger().error(
             "Don't execute stop command when backup"_tr()
         );
         return;

@@ -180,14 +180,16 @@ bool ZipFiles(const std::string& worldName) {
         std::string backupPath = backup_helper::getConfig().GetValue("Main", "BackupPath", "backup");
         int         level      = backup_helper::getConfig().GetLongValue("Main", "Compress", 0);
 
+        using namespace ll::string_utils;
         // Prepare command line
-        auto paras = ll::string_utils::str2wstr(
+        auto paras = str2wstr(
             fmt::format(
-                "a \"{}\\{}_{}.7z\" \"{}/{}\" -sdel -mx{} -mmt",
+                "a \"{}\\{}_{}.{}\" \"{}/{}\" -sdel -mx{} -mmt",
                 backupPath,
                 worldName,
                 timeStr,
-                ll::string_utils::u8str2str((TEMP_DIR).u8string()),
+                backup_helper::getConfig().GetValue("Main", "ArchiveFormat", "7z"),
+                u8str2str((TEMP_DIR).u8string()),
                 worldName,
                 level
             )
@@ -198,7 +200,7 @@ bool ZipFiles(const std::string& worldName) {
         else maxWait *= 1000;
 
         // Start Process
-        std::wstring     zipPath = ll::string_utils::str2wstr(ZIP_PATH);
+        std::wstring     zipPath = str2wstr(ZIP_PATH);
         SHELLEXECUTEINFO sh      = {sizeof(SHELLEXECUTEINFO)};
         sh.fMask                 = SEE_MASK_NOCLOSEPROCESS;
         sh.hwnd                  = nullptr;
@@ -228,7 +230,7 @@ bool ZipFiles(const std::string& worldName) {
         return false;
     } catch (...) {
         SendFeedback(playerUuid, "Exception in unzip process!");
-        ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
+        ll::error_utils::printCurrentException(backup_helper::getLogger());
         // FailEnd(GetLastError());
         return false;
     }
@@ -238,20 +240,20 @@ bool ZipFiles(const std::string& worldName) {
 bool UnzipFiles(const std::string& fileName) {
     try {
         // Get Name
-
         std::string backupPath = backup_helper::getConfig().GetValue("Main", "BackupPath", "backup");
 
-        auto paras = ll::string_utils::str2wstr(
-            fmt::format("x \"{}\\{}\" -o{}", backupPath, fileName, ll::string_utils::u8str2str((TEMP_DIR).u8string()))
-        );
-        std::filesystem::remove_all(TEMP1_DIR);
+        using namespace ll::string_utils;
+
+        auto paras =
+            str2wstr(fmt::format("x \"{}\\{}\" -o\"{}\"", backupPath, fileName, u8str2str((TEMP1_DIR).u8string())));
+        std::filesystem::remove_all(TEMP_DIR);
 
         DWORD maxWait = backup_helper::getConfig().GetLongValue("Main", "MaxWaitForZip", 0);
         if (maxWait <= 0) maxWait = 0xFFFFFFFF;
         else maxWait *= 1000;
 
         // Start Process
-        std::wstring     zipPath = ll::string_utils::str2wstr(ZIP_PATH);
+        std::wstring     zipPath = str2wstr(ZIP_PATH);
         SHELLEXECUTEINFO sh      = {sizeof(SHELLEXECUTEINFO)};
         sh.fMask                 = SEE_MASK_NOCLOSEPROCESS;
         sh.hwnd                  = nullptr;
@@ -281,7 +283,7 @@ bool UnzipFiles(const std::string& fileName) {
         return false;
     } catch (...) {
         SendFeedback(playerUuid, "Exception in unzip process!");
-        ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
+        ll::error_utils::printCurrentException(backup_helper::getLogger());
         // FailEnd(GetLastError());
         return false;
     }
@@ -294,8 +296,8 @@ bool UnzipFiles(const std::string& fileName) {
 std::vector<std::string> getAllBackup() {
     std::string                      backupPath = backup_helper::getConfig().GetValue("Main", "BackupPath", "backup");
     std::filesystem::directory_entry entry(backupPath);
-    std::regex                       isBackFile(".*7z");
-    std::vector<std::string>         result;
+    std::regex isBackFile(fmt::format(".*{}", backup_helper::getConfig().GetValue("Main", "ArchiveFormat", "7z")));
+    std::vector<std::string> result;
     if (entry.status().type() == std::filesystem::file_type::directory) {
         for (const auto& iter : std::filesystem::directory_iterator(backupPath)) {
             std::string str = iter.path().filename().string();
@@ -336,7 +338,7 @@ bool CopyRecoverFile(const std::string& worldName) {
         std::filesystem::remove_all("./worlds/" + worldName + "_bak");
         return true;
     } catch (...) {
-        ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
+        ll::error_utils::printCurrentException(backup_helper::getLogger());
         return false;
     }
 }
@@ -356,7 +358,7 @@ bool StartBackup() {
         ll::service::getMinecraft()->mCommands->executeCommand(context, false);
     } catch (...) {
         SendFeedback(playerUuid, "Failed to start backup snapshot!");
-        ll::error_utils::printCurrentException(backup_helper::BackupHelper::getInstance().getSelf().getLogger());
+        ll::error_utils::printCurrentException(backup_helper::getLogger());
         FailEnd();
         return false;
     }
