@@ -184,7 +184,7 @@ bool ZipFiles(const std::string& worldName) {
         // Prepare command line
         auto paras = str2wstr(
             fmt::format(
-                "a \"{}\\{}_{}.{}\" \"{}/{}\" -sdel -mx{} -mmt",
+                R"(a "{}\{}_{}.{}" "{}/{}" -sdel -mx{} -mmt)",
                 backupPath,
                 worldName,
                 timeStr,
@@ -245,7 +245,7 @@ bool UnzipFiles(const std::string& fileName) {
         using namespace ll::string_utils;
 
         auto paras =
-            str2wstr(fmt::format("x \"{}\\{}\" -o\"{}\"", backupPath, fileName, u8str2str((TEMP1_DIR).u8string())));
+            str2wstr(fmt::format(R"(x "{}\{}" -o"{}")", backupPath, fileName, u8str2str((TEMP1_DIR).u8string())));
         std::filesystem::remove_all(TEMP_DIR);
 
         DWORD maxWait = backup_helper::getConfig().GetLongValue("Main", "MaxWaitForZip", 0);
@@ -426,7 +426,7 @@ void ResumeBackup() {
         std::string   outputStr;
         if (command) {
             command->run(origin, output);
-            for (auto msg : output.mMessages) {
+            for (const auto& msg : output.mMessages) {
                 auto opStr = getI18n().getCurrentLanguage()->_get(msg.mMessageId, msg.mParams);
                 if (opStr.valid) {
                     outputStr += opStr.string.get() + "\n";
