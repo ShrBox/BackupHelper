@@ -7,6 +7,7 @@ namespace backup_helper {
 
 std::filesystem::path getConfigPath();
 CSimpleIniA&          getConfig();
+ll::io::Logger&       getLogger();
 
 class BackupHelper {
 
