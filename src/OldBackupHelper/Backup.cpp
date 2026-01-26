@@ -61,8 +61,7 @@ void FailEnd(int code = -1) {
 
 void ControlResourceUsage(HANDLE process) {
     // Job
-    HANDLE hJob = CreateJobObject(NULL, L"BACKUP_HELPER_HELP_PROGRAM");
-    if (hJob) {
+    if (HANDLE hJob = CreateJobObject(nullptr, L"BACKUP_HELPER_HELP_PROGRAM")) {
         JOBOBJECT_BASIC_LIMIT_INFORMATION limit = {0};
         limit.PriorityClass                     = BELOW_NORMAL_PRIORITY_CLASS;
         limit.LimitFlags                        = JOB_OBJECT_LIMIT_PRIORITY_CLASS;
@@ -72,14 +71,13 @@ void ControlResourceUsage(HANDLE process) {
     }
 
     // CPU Limit
-    SYSTEM_INFO si;
-    memset(&si, 0, sizeof(SYSTEM_INFO));
+    SYSTEM_INFO si = {};
     GetSystemInfo(&si);
     DWORD cpuCnt  = si.dwNumberOfProcessors;
     DWORD cpuMask = 1;
     if (cpuCnt > 1) {
         if (cpuCnt % 2 == 1) cpuCnt -= 1;
-        cpuMask = int(sqrt(1 << cpuCnt)) - 1; // sqrt(2^n)-1
+        cpuMask = static_cast<int>(sqrt(1 << cpuCnt)) - 1; // sqrt(2^n)-1
     }
     SetProcessAffinityMask(process, cpuMask);
 }
@@ -89,7 +87,7 @@ void ClearOldBackup() {
     if (days < 0) return;
     SendFeedback(playerUuid, "Maximum backup retention time: {0} days"_tr(days));
 
-    time_t       timeStamp = time(NULL) - days * 86400;
+    time_t       timeStamp = time(nullptr) - days * 86400;
     std::wstring dirBackup =
         ll::string_utils::str2wstr(backup_helper::getConfig().GetValue("Main", "BackupPath", "backup"));
     std::wstring dirFind = dirBackup + L"\\*";
@@ -108,7 +106,7 @@ void ClearOldBackup() {
         else {
             createTime.LowPart  = findFileData.ftCreationTime.dwLowDateTime;
             createTime.HighPart = findFileData.ftCreationTime.dwHighDateTime;
-            if (createTime.QuadPart / 10000000 - 11644473600 < (ULONGLONG)timeStamp) {
+            if (createTime.QuadPart / 10000000 - 11644473600 < static_cast<ULONGLONG>(timeStamp)) {
                 DeleteFile((dirBackup + L"\\" + findFileData.cFileName).c_str());
                 ++clearCount;
             }
@@ -117,7 +115,6 @@ void ClearOldBackup() {
     FindClose(hFind);
 
     if (clearCount > 0) SendFeedback(playerUuid, "{0} old backups cleaned."_tr(clearCount));
-    return;
 }
 
 void CleanTempDir() {
@@ -125,7 +122,7 @@ void CleanTempDir() {
     std::filesystem::remove_all(std::filesystem::path(TEMP_DIR), code);
 }
 
-bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLength>& files) {
+bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLength> const& files) {
     SendFeedback(playerUuid, "The list of files to be backed up has been captured. Processing..."_tr());
     SendFeedback(playerUuid, "Copying files..."_tr());
 
@@ -153,10 +150,10 @@ bool CopyFiles(const std::string& worldName, std::vector<SnapshotFilenameAndLeng
             ll::string_utils::str2wstr(toFile).c_str(),
             GENERIC_READ | GENERIC_WRITE,
             0,
-            NULL,
+            nullptr,
             OPEN_EXISTING,
             0,
-            0
+            nullptr
         );
 
         if (hSaveFile == INVALID_HANDLE_VALUE || !SetFilePointerEx(hSaveFile, pos, &curPos, FILE_BEGIN)
@@ -175,7 +172,7 @@ bool ZipFiles(const std::string& worldName) {
     try {
         // Get Name
         char   timeStr[32];
-        time_t nowtime = time(0);
+        time_t nowtime = time(nullptr);
         tm     info;
         localtime_s(&info, &nowtime);
         strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H-%M-%S", &info);
@@ -187,7 +184,7 @@ bool ZipFiles(const std::string& worldName) {
         // Prepare command line
         auto paras = str2wstr(
             fmt::format(
-                "a \"{}\\{}_{}.{}\" \"{}/{}\" -sdel -mx{} -mmt",
+                R"(a "{}\{}_{}.{}" "{}/{}" -sdel -mx{} -mmt)",
                 backupPath,
                 worldName,
                 timeStr,
@@ -206,7 +203,7 @@ bool ZipFiles(const std::string& worldName) {
         std::wstring     zipPath = str2wstr(ZIP_PATH);
         SHELLEXECUTEINFO sh      = {sizeof(SHELLEXECUTEINFO)};
         sh.fMask                 = SEE_MASK_NOCLOSEPROCESS;
-        sh.hwnd                  = NULL;
+        sh.hwnd                  = nullptr;
         sh.lpVerb                = L"open";
         sh.nShow                 = SW_HIDE;
         sh.lpFile                = zipPath.c_str();
@@ -248,7 +245,7 @@ bool UnzipFiles(const std::string& fileName) {
         using namespace ll::string_utils;
 
         auto paras =
-            str2wstr(fmt::format("x \"{}\\{}\" -o\"{}\"", backupPath, fileName, u8str2str((TEMP1_DIR).u8string())));
+            str2wstr(fmt::format(R"(x "{}\{}" -o"{}")", backupPath, fileName, u8str2str((TEMP1_DIR).u8string())));
         std::filesystem::remove_all(TEMP_DIR);
 
         DWORD maxWait = backup_helper::getConfig().GetLongValue("Main", "MaxWaitForZip", 0);
@@ -259,7 +256,7 @@ bool UnzipFiles(const std::string& fileName) {
         std::wstring     zipPath = str2wstr(ZIP_PATH);
         SHELLEXECUTEINFO sh      = {sizeof(SHELLEXECUTEINFO)};
         sh.fMask                 = SEE_MASK_NOCLOSEPROCESS;
-        sh.hwnd                  = NULL;
+        sh.hwnd                  = nullptr;
         sh.lpVerb                = L"open";
         sh.nShow                 = SW_HIDE;
         sh.lpFile                = zipPath.c_str();
@@ -309,7 +306,7 @@ std::vector<std::string> getAllBackup() {
             }
         }
     }
-    std::reverse(result.begin(), result.end());
+    std::ranges::reverse(result);
     return result;
 }
 
@@ -422,14 +419,14 @@ void ResumeBackup() {
         auto command = ll::service::getMinecraft()->mCommands->compileCommand(
             HashedString("save resume"),
             origin,
-            (CurrentCmdVersion)CommandVersion::CurrentVersion(),
+            static_cast<CurrentCmdVersion>(CommandVersion::CurrentVersion()),
             [](std::string const&) {}
         );
         CommandOutput output(CommandOutputType::AllOutput);
         std::string   outputStr;
         if (command) {
             command->run(origin, output);
-            for (auto msg : output.mMessages) {
+            for (const auto& msg : output.mMessages) {
                 auto opStr = getI18n().getCurrentLanguage()->_get(msg.mMessageId, msg.mParams);
                 if (opStr.valid) {
                     outputStr += opStr.string.get() + "\n";

@@ -6,7 +6,6 @@
 #include "mc/world/actor/player/Player.h"
 #include "mc/world/level/Level.h"
 
-#include <exception>
 #include <string>
 
 
@@ -18,7 +17,6 @@ inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
         player = level->getPlayer(uuid);
     }
     if (!player) {
-        extern mce::UUID playerUuid;
         playerUuid = uuid;
     }
     if (!player) {
@@ -26,7 +24,6 @@ inline void SendFeedback(mce::UUID uuid, const std::string& msg) {
     } else try {
             player->sendMessage("§e[BackupHelper]§r " + msg);
         } catch (...) {
-            extern mce::UUID playerUuid;
             playerUuid = mce::UUID::EMPTY();
             backup_helper::getLogger().info(msg);
         }
