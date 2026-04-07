@@ -352,7 +352,7 @@ bool StartBackup() {
         std::make_unique<ServerCommandOrigin>(
             ServerCommandOrigin("Server", ll::service::getLevel()->asServer(), CommandPermissionLevel::Internal, 0)
         ),
-        CommandVersion::CurrentVersion()
+        static_cast<int>(CurrentCmdVersion::Latest)
     );
     try {
         ll::service::getMinecraft()->mCommands->executeCommand(context, false);
@@ -398,7 +398,7 @@ bool StartRecover(int recover_NUM) {
         std::make_unique<ServerCommandOrigin>(
             ServerCommandOrigin("Server", ll::service::getLevel()->asServer(), CommandPermissionLevel::Internal, 0)
         ),
-        CommandVersion::CurrentVersion()
+        static_cast<int>(CurrentCmdVersion::Latest)
     );
     ll::service::getMinecraft()->mCommands->executeCommand(context, false);
     SendFeedback(
@@ -419,7 +419,7 @@ void ResumeBackup() {
         auto command = ll::service::getMinecraft()->mCommands->compileCommand(
             HashedString("save resume"),
             origin,
-            static_cast<CurrentCmdVersion>(CommandVersion::CurrentVersion()),
+            CurrentCmdVersion::Latest,
             [](std::string const&) {}
         );
         CommandOutput output(CommandOutputType::AllOutput);

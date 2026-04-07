@@ -99,11 +99,10 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     ll::memory::HookPriority::Normal,
     PropertiesSettings,
     &PropertiesSettings::$ctor,
-    void*,
-    std::string const& filename
+    void*
 ) {
     RecoverWorld();
-    return origin(filename);
+    return origin();
 }
 
 LL_AUTO_TYPE_INSTANCE_HOOK(
