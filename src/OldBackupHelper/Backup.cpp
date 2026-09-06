@@ -11,11 +11,9 @@
 #include "mc/deps/core/utility/MCRESULT.h"
 #include "mc/locale/I18n.h"
 #include "mc/locale/Localization.h"
-#include "mc/locale/OptionalString.h"
 #include "mc/server/commands/Command.h"
 #include "mc/server/commands/CommandContext.h"
 #include "mc/server/commands/CommandOutput.h"
-#include "mc/server/commands/CommandVersion.h"
 #include "mc/server/commands/MinecraftCommands.h"
 #include "mc/server/commands/ServerCommandOrigin.h"
 #include "mc/world/Minecraft.h"
@@ -427,10 +425,7 @@ void ResumeBackup() {
         if (command) {
             command->run(origin, output);
             for (const auto& msg : output.mMessages) {
-                auto opStr = getI18n().getCurrentLanguage()->_get(msg.mMessageId, msg.mParams);
-                if (opStr.valid) {
-                    outputStr += opStr.string.get() + "\n";
-                }
+                getI18n().getCurrentLanguage()->get(msg.mMessageId, outputStr, msg.mParams);
             }
             if (!output.mMessages.empty()) {
                 outputStr.pop_back();
