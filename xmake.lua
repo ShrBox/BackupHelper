@@ -1,24 +1,20 @@
 add_rules("mode.debug", "mode.release")
 
-add_repositories("liteldev-repo https://github.com/LiteLDev/xmake-repo.git")
-
-if is_config("target_type", "server") then
-    add_requires("levilamina 26.51.*", {configs = {target_type = "server"}})
-else
-    add_requires("levilamina 26.51.*", {configs = {target_type = "client"}})
-end
-
-add_requires("levibuildscript", "simpleini")
-
-if not has_config("vs_runtime") then
-    set_runtimes("MD")
-end
+add_repositories("levimc-repo https://github.com/LiteLDev/xmake-repo.git")
 
 option("target_type")
     set_default("server")
     set_showmenu(true)
     set_values("server", "client")
 option_end()
+
+add_requires("levilamina 26.60.*", {configs = {target_type = get_config("target_type")}})
+
+add_requires("levibuildscript", "simpleini")
+
+if not has_config("vs_runtime") then
+    set_runtimes("MD")
+end
 
 target("BackupHelper")
     add_rules("@levibuildscript/linkrule")
